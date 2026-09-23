@@ -1,0 +1,14 @@
+# Sesiones y cookies privadas (NUNCA COMPARTIR)
+.session_data/
+*.json
+
+# Entorno virtual y dependencias
+.venv/
+__pycache__/
+*.pyc
+
+# Materiales descargados
+cuadernos/
+
+# Archivos temporales de paquete
+Blackboard-CLI.zip

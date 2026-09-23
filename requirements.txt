@@ -1,0 +1,7 @@
+playwright>=1.40.0
+httpx>=0.27.0
+rich>=13.0.0
+beautifulsoup4>=4.12.0
+html2text>=2024.2.26
+pypdf>=4.0.0
+python-dateutil>=2.9.0
