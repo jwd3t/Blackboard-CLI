@@ -86,3 +86,12 @@ Una vez descargados tus cuadernos, puedes abrir la carpeta en tu editor favorito
 
 * Windows 10 o Windows 11 (64 bits).
 * Tener Python 3.10 o superior instalado (marcando la casilla *"Add python.exe to PATH"*). El script `run.bat` se encargará de todo lo demás.
+
+---
+
+## 📄 Licencia
+
+Este proyecto está protegido bajo la licencia **GNU General Public License v3.0 (GPLv3)**.  
+Consulta el archivo [LICENSE](LICENSE) para más detalles.
+
+*Está permitido el uso libre, estudio y mejora del código, pero cualquier derivado debe permanecer bajo la misma licencia abierta, garantizando siempre el crédito al autor original y prohibiendo la apropiación o cierre del software.*

@@ -28,6 +28,7 @@ FILES_TO_INCLUDE = [
     "run.bat",
     "package.py",
     "README.md",
+    "LICENSE",
     ".gitignore"
 ]
 
