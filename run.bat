@@ -87,14 +87,49 @@ for /d %%D in ("%USERPROFILE%\anaconda3", "%USERPROFILE%\miniconda3") do (
 )
 
 :run
-if not "%PY_CMD%"=="" (
+if "%PY_CMD%"=="" goto :not_found
+
+if exist ".venv\Scripts\python.exe" goto :execute_venv
+
+echo [*] Configurando entorno virtual aislado (.venv)...
+echo [*] Esto se realiza solo una vez y no dejara residuos en tu sistema.
+echo.
+
+%PY_CMD% -m venv .venv
+if errorlevel 1 (
+    echo [!] No se pudo crear el entorno virtual automaticamente.
+    echo [!] Ejecutando con el Python del sistema...
     %PY_CMD% cli.py %*
-    if errorlevel 1 (
-        echo.
-        pause
-    )
+    goto :finish
+)
+
+echo [*] Instalando librerias necesarias en .venv...
+".venv\Scripts\python.exe" -m pip install --upgrade pip >nul 2>&1
+".venv\Scripts\python.exe" -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo [X] Error al instalar las dependencias en .venv.
+    pause
     goto :eof
 )
+
+echo [*] Preparando navegador para inicio de sesion (Playwright)...
+".venv\Scripts\python.exe" -m playwright install chromium
+
+echo.
+echo [v] Entorno virtual listo. Iniciando Blackboard CLI...
+echo.
+
+:execute_venv
+".venv\Scripts\python.exe" cli.py %*
+
+:finish
+if errorlevel 1 (
+    echo.
+    pause
+)
+goto :eof
+
+:not_found
 
 echo.
 echo ========================================================

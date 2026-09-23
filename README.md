@@ -1,65 +1,88 @@
-# 📚 Blackboard Ultra Sync (UPC) - Cuadernos de Estudio para IA
+# 🎓 Blackboard CLI (UPC) — AI Study Notebook Sync
 
-Herramienta en consola para **Blackboard Ultra (UPC)** que extrae automáticamente tus cursos, materiales, anuncios y evaluaciones, organizándolos en una estructura estandarizada de **"Cuadernos de Estudio"** optimizada tanto para ti como para cualquier modelo de Inteligencia Artificial.
-
----
-
-## 🚀 Inicio Rápido
-
-### Opción 1: Ejecutar con el archivo por lotes (Recomendado en Windows)
-Haz doble clic en `run.bat` o ejecútalo desde tu terminal:
-```powershell
-.\run.bat
-```
-
-### Opción 2: Usar el entorno virtual directamente
-```powershell
-.\.venv\Scripts\activate
-python cli.py
-```
+Herramienta de consola moderna y profesional para **Blackboard Ultra (UPC)**. Sincroniza tus cursos, materiales semanales, evaluaciones y anuncios oficiales, organizándolos en **Cuadernos de Estudio en Markdown** listos para ser leídos por ti o por cualquier Inteligencia Artificial (Antigravity, Claude, ChatGPT, Gemini, etc.).
 
 ---
 
-## 🧭 Comandos Disponibles
+## ⚡ Inicio Rápido (Sin complicaciones)
 
-| Comando | Descripción |
-| :--- | :--- |
-| `python cli.py` | Abre el **Menú Interactivo** con opciones numéricas. |
-| `python cli.py login` | Abre una ventana de Chromium para ingresar con tu cuenta UPC (`@upc.edu.pe`) y confirmar 2FA. |
-| `python cli.py status` | Muestra el estado de la conexión y los datos del estudiante autenticado. |
-| `python cli.py courses` | Muestra la tabla de cursos en los que estás matriculado actualmente. |
-| `python cli.py agenda` | Muestra el calendario unificado de exámenes, entregas y tareas pendientes. |
-| `python cli.py sync` | **Descarga y genera automáticamente los cuadernos** (archivos, sílabos, rúbricas). |
+No necesitas configurar entornos manualmente. El programa incluye un gestor automático en Windows.
+
+1. **Descarga y descomprime:**
+   - Descarga el archivo `Blackboard-CLI.zip` desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu PC.
+2. **Ejecutar:**
+   - Haz doble clic en **`run.bat`**.
+   - *Nota de la primera vez:* En su primer arranque, el programa creará automáticamente un entorno virtual aislado (`.venv`) e instalará las librerías necesarias. **No dejará ningún residuo en tu sistema.**
+3. **Iniciar Sesión:**
+   - En el menú principal, selecciona la opción `[5] login`.
+   - Se abrirá una ventana de navegador donde podrás ingresar con tu correo UPC (`@upc.edu.pe`), contraseña institucional y confirmar tu verificación en dos pasos (2FA).
+   - ¡Listo! Tu sesión quedará guardada de forma segura localmente.
 
 ---
 
-## 🗂️ Estructura de los "Cuadernos de Estudio" Generados
+## 🖥️ Menú Interactivo
 
-Cuando ejecutas `sync`, se genera la carpeta `cuadernos/` con esta organización:
+Al abrir `run.bat`, verás la consola interactiva con las siguientes opciones:
+
+| Opción | Comando | Descripción |
+| :---: | :--- | :--- |
+| `[1]` | `sync` | **Sincronizador:** Permite descargar todo el semestre o elegir un curso y semana específica. |
+| `[2]` | `agenda` | **Radar de Evaluaciones:** Lista exámenes, tareas y fechas de entrega ordenadas cronológicamente. |
+| `[3]` | `cursos` | **Asignaturas:** Tabla con tus cursos activos del ciclo y sus códigos. |
+| `[4]` | `status` | **Diagnóstico:** Revisa el estado de la conexión con el servidor Ultra y tu perfil de estudiante. |
+| `[5]` | `login` | **Iniciar Sesión:** Abre el navegador para autenticarte vía Microsoft 365 / SSO. |
+| `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies locales de tu PC. |
+| `[7]` | `package`| **Empaquetar:** Genera un archivo ZIP limpio y seguro para compartir con tus compañeros. |
+| `[0]` | `exit` | Cierra la aplicación. |
+
+> 💡 **Tip de Navegación:** Dentro de los menús de sincronización puedes escribir **`v`** en cualquier momento para volver a la pantalla anterior sin cerrar el programa.
+
+---
+
+## 📁 Estructura de los "Cuadernos de Estudio" Generados
+
+Al sincronizar, se creará una carpeta llamada `cuadernos/` con una estructura limpia y estandarizada:
 
 ```text
 cuadernos/
-├── RESUMEN_SEMESTRE_IA.md        <-- 🧠 Portada general para la IA (fechas de exámenes consolidadas)
+├── RESUMEN_SEMESTRE_IA.md        <-- 🧠 Índice general del ciclo con radar de exámenes
 └── [CODIGO] Nombre del Curso/
-    ├── CUADERNO_CURSO.md         <-- 📓 Cuaderno central del curso con resumen y enlaces
-    ├── 00_INFORMACION_GENERAL/   <-- 📄 Sílabos, planes calendario y fórmulas de evaluación
-    │   ├── silabo.pdf
-    │   └── plan_calendario.pdf
+    ├── CUADERNO_CURSO.md         <-- 📓 Cuaderno maestro del curso con fórmulas y enlaces
+    ├── 00_INFORMACION_GENERAL/   <-- 📄 Sílabos, normas del curso y plan calendario
     ├── 01_EVALUACIONES_Y_EXAMENES/
-    │   └── agenda_evaluaciones.md <-- 📅 Fechas, temas que vienen en los exámenes y rúbricas
-    ├── 02_MATERIALES_Y_CLASES/   <-- 📚 Diapositivas PPTX, lecturas y prácticas por semana
+    │   └── agenda_evaluaciones.md <-- 📅 Fechas, temas de evaluaciones y ponderaciones
+    ├── 02_MATERIALES_Y_CLASES/   <-- 📚 Contenido organizado por Semanas o Unidades
     │   ├── Semana 01/
     │   └── Semana 02/
     └── 03_ANUNCIOS/
-        └── historial_anuncios.md <-- 📢 Todos los comunicados oficiales del profesor
+        └── historial_anuncios.md <-- 📢 Comunicados oficiales del profesor
 ```
 
 ---
 
-## 🤖 ¿Cómo interactúa la IA con esto?
+## 🤖 ¿Cómo estudiar con IA usando estos cuadernos?
 
-1. Una vez ejecutado `python cli.py sync`, los archivos quedan en texto limpio (Markdown) y documentos reales en tu disco.
-2. Puedes pedirle a **Antigravity** o a cualquier IA preguntas como:
-   - *"¿Qué exámenes tengo esta semana y qué entra en cada uno?"* (La IA leerá `cuadernos/RESUMEN_SEMESTRE_IA.md` y `agenda_evaluaciones.md`).
-   - *"Explícame el tema de la Semana 3 de Física"* (La IA leerá las diapositivas o documentos en `02_MATERIALES_Y_CLASES/Semana 03`).
-   - *"¿Cuál es la fórmula para aprobar tal materia?"* (La IA leerá el sílabo en `00_INFORMACION_GENERAL/`).
+Una vez descargados tus cuadernos, puedes abrir la carpeta en tu editor favorito (Cursor, VS Code, Obsidian) o arrastrar los archivos a cualquier IA:
+
+* **Preguntar por evaluaciones:**
+  > *"¿Qué evaluaciones tengo en las próximas dos semanas y cuál tiene mayor peso porcentual?"*  
+  *(La IA leerá `cuadernos/RESUMEN_SEMESTRE_IA.md` y las agendas).*
+* **Estudiar temas semanales:**
+  > *"Explícame de forma sencilla el contenido teórico de la Semana 03 de este curso."*  
+  *(La IA consultará los archivos Markdown de la semana seleccionada).*
+* **Consultar fórmulas de calificación:**
+  > *"¿Cuánto necesito sacar en el examen final para aprobar el curso según la fórmula del sílabo?"*
+
+---
+
+## 🔒 Privacidad y Seguridad
+
+* **Tus credenciales nunca se comparten:** Ni tus contraseñas, ni tus cookies de sesión se suben a ningún servidor externo. Todo se ejecuta 100% de forma local en tu máquina.
+* **El comando `package` es seguro:** Si deseas compartir la herramienta con un amigo, la opción `[7] package` genera un ZIP que automáticamente excluye tus archivos personales, notas y sesiones.
+
+---
+
+## 🛠️ Requisitos del Sistema
+
+* Windows 10 o Windows 11 (64 bits).
+* Tener Python 3.10 o superior instalado (marcando la casilla *"Add python.exe to PATH"*). El script `run.bat` se encargará de todo lo demás.
