@@ -11,4 +11,4 @@ __pycache__/
 cuadernos/
 
 # Archivos temporales de paquete
-Blackboard-CLI.zip
+*.zip

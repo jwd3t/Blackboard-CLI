@@ -3,6 +3,9 @@ Configuraciones globales para el sincronizador de Blackboard Ultra UPC.
 """
 from pathlib import Path
 
+# Versión del software
+VERSION = "2.0.0"
+
 # URL base del aula virtual
 BASE_URL = "https://aulavirtual.upc.edu.pe"
 

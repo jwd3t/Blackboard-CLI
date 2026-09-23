@@ -59,7 +59,7 @@ from rich.progress import (
 
 console = Console(force_terminal=True, color_system="truecolor")
 
-from config import BASE_URL, OUTPUT_DIR
+from config import BASE_URL, OUTPUT_DIR, VERSION
 from auth import verify_session, interactive_login, logout
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer, format_date
@@ -68,9 +68,6 @@ try:
     HAS_PACKAGE = True
 except ImportError:
     HAS_PACKAGE = False
-
-
-VERSION = "2.0.0"
 
 TEXT_FULL = r"""[bold bright_cyan]
  ██████╗ ██╗      █████╗  ██████╗██╗  ██╗██████╗  ██████╗  █████╗ ██████╗ ██████╗
