@@ -12,3 +12,8 @@ cuadernos/
 
 # Archivos temporales de paquete
 *.zip
+
+# Archivos del sistema operativo
+.DS_Store
+*.DS_Store
+Thumbs.db

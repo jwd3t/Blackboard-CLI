@@ -11,8 +11,9 @@ No necesitas configurar entornos manualmente. El programa incluye gestores autom
 1. **Descarga y descomprime:**
    - Descarga el archivo `Blackboard-CLI.zip` desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
 2. **Ejecutar:**
-   - **En Windows:** Haz doble clic en **`run.bat`**.
-   - **En Mac:** Abre la terminal en la carpeta y ejecuta **`./run.sh`** (o haz doble clic en **`run.command`**).
+   - **En Windows:** Haz doble clic en **`BlackboardCLI-v2.1.1-Windows.bat`**.
+   - **En Mac:** Haz doble clic en **`BlackboardCLI-v2.1.1-macOS.command`** (o en la terminal: `./BlackboardCLI-v2.1.1-macOS.command`).
+   - **En Linux:** Abre la terminal en la carpeta y ejecuta **`./BlackboardCLI-v2.1.1-Linux.sh`**.
    - *Nota de la primera vez:* En su primer arranque, el programa creará automáticamente un entorno virtual aislado (`.venv`) e instalará las librerías necesarias. **No dejará ningún residuo en tu sistema.**
 3. **Iniciar Sesión:**
    - En el menú principal, selecciona la opción `[5] login`.
@@ -23,7 +24,7 @@ No necesitas configurar entornos manualmente. El programa incluye gestores autom
 
 ## 🖥️ Menú Interactivo
 
-Al abrir `run.bat`, verás la consola interactiva con las siguientes opciones:
+Al iniciar la aplicación, verás la consola interactiva con las siguientes opciones:
 
 | Opción | Comando | Descripción |
 | :---: | :--- | :--- |
@@ -87,7 +88,7 @@ Una vez descargados tus cuadernos, puedes abrir la carpeta en tu editor favorito
 
 * **Windows:** Windows 10 o Windows 11 (64 bits).
 * **macOS:** macOS Catalina (10.15) o superior.
-* Tener Python 3.9 o superior instalado (Python 3.10+ recomendado; en Windows marcar *"Add python.exe to PATH"*; en Mac instalar vía `brew install python` o python.org). Los scripts `run.bat` y `run.sh` se encargarán de todo lo demás.
+* Tener Python 3.9 o superior instalado (Python 3.10+ recomendado; en Windows marcar *"Add python.exe to PATH"*; en Mac instalar vía `brew install python` o python.org). Los scripts de inicio se encargarán de todo lo demás.
 
 ---
 

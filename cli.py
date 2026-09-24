@@ -624,27 +624,31 @@ def interactive_menu():
 
 
 def main():
-    if len(sys.argv) > 1:
-        arg = sys.argv[1].lower()
-        if arg == "login":
-            cmd_login()
-        elif arg == "status":
-            cmd_status()
-        elif arg in ["courses", "cursos"]:
-            cmd_courses()
-        elif arg in ["agenda", "calendar", "examenes"]:
-            cmd_agenda()
-        elif arg == "sync":
-            cmd_sync()
-        elif arg == "logout":
-            cmd_logout()
-        elif arg in ["package", "empaquetar"]:
-            cmd_package()
+    try:
+        if len(sys.argv) > 1:
+            arg = sys.argv[1].lower()
+            if arg == "login":
+                cmd_login()
+            elif arg == "status":
+                cmd_status()
+            elif arg in ["courses", "cursos"]:
+                cmd_courses()
+            elif arg in ["agenda", "calendar", "examenes"]:
+                cmd_agenda()
+            elif arg == "sync":
+                cmd_sync()
+            elif arg == "logout":
+                cmd_logout()
+            elif arg in ["package", "empaquetar"]:
+                cmd_package()
+            else:
+                console.print(f"[red]Comando desconocido: {arg}[/red]")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, package")
         else:
-            console.print(f"[red]Comando desconocido: {arg}[/red]")
-            console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, package")
-    else:
-        interactive_menu()
+            interactive_menu()
+    except KeyboardInterrupt:
+        console.print("\n\n[dim]👋 Operación cancelada por el usuario. ¡Hasta luego![/dim]\n")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

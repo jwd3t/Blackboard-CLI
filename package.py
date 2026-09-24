@@ -18,6 +18,10 @@ BASE_DIR = Path(__file__).resolve().parent
 ZIP_NAME = BASE_DIR / f"Blackboard-CLI-v{VERSION}.zip"
 LEGACY_ZIP_NAME = BASE_DIR / "Blackboard-CLI.zip"
 
+WIN_LAUNCHER = f"BlackboardCLI-v{VERSION}-Windows.bat"
+MAC_LAUNCHER = f"BlackboardCLI-v{VERSION}-macOS.command"
+LINUX_LAUNCHER = f"BlackboardCLI-v{VERSION}-Linux.sh"
+
 FILES_TO_INCLUDE = [
     "cli.py",
     "ultra_client.py",
@@ -25,13 +29,14 @@ FILES_TO_INCLUDE = [
     "auth.py",
     "config.py",
     "requirements.txt",
-    "run.bat",
-    "run.sh",
-    "run.command",
+    WIN_LAUNCHER,
+    MAC_LAUNCHER,
+    LINUX_LAUNCHER,
     "package.py",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
-    ".gitignore"
+    
 ]
 
 def create_package():

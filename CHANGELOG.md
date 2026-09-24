@@ -7,6 +7,16 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.1.1] - 2026-09-24
+
+### 🔧 Mejoras y Correcciones Menores (Polish)
+- **Lanzadores descriptivos por plataforma:** Se renombraron los archivos de inicio genéricos a `BlackboardCLI-v{VERSION}-{Plataforma}` (`BlackboardCLI-v2.1.1-Windows.bat`, `BlackboardCLI-v2.1.1-macOS.command` y `BlackboardCLI-v2.1.1-Linux.sh`) para una identificación inmediata y sin confusiones del archivo a ejecutar.
+- **Empaquetado completo:** Se incluyó `CHANGELOG.md` y los nuevos lanzadores en la lista de archivos distribuidos por `package.py` para que el ZIP compartido contenga siempre el historial de versiones.
+- **Salida elegante con `Ctrl+C`:** La interrupción por teclado (`KeyboardInterrupt`) en `cli.py` ahora muestra un mensaje amigable y sale limpiamente sin mostrar trazas de error de Python.
+- **Limpieza de sistema en Git:** Se agregaron `.DS_Store` y `Thumbs.db` al `.gitignore` para evitar archivos temporales generados por Finder (macOS) y el explorador de Windows.
+
+---
+
 ## [2.1.0] - 2026-09-24
 
 ### ✨ Añadido
