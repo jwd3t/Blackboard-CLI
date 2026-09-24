@@ -3,6 +3,8 @@ Módulo de autenticación y manejo de sesión para Blackboard Ultra UPC.
 Utiliza Playwright con un perfil persistente para permitir inicio de sesión SSO/2FA
 y extrae las cookies de sesión para consultas API rápidas.
 """
+from __future__ import annotations
+
 import sys
 import json
 import time

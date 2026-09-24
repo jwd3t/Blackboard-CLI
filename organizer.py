@@ -3,6 +3,8 @@ Módulo organizador de "Cuadernos de Curso".
 Estructura automáticamente la información dispersa de Blackboard Ultra
 en carpetas limpias y genera archivos Markdown optimizados para el estudiante y la IA.
 """
+from __future__ import annotations
+
 import re
 import json
 from pathlib import Path

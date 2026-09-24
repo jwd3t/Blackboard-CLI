@@ -2,6 +2,8 @@
 Blackboard CLI (UPC) - Asistente de Aula Virtual y Cuadernos de Estudio para IA.
 Diseñado con una interfaz moderna inspirada en CLI de agentes de IA (Claude Code, Antigravity).
 """
+from __future__ import annotations
+
 import sys
 import subprocess
 from pathlib import Path

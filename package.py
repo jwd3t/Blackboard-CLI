@@ -26,6 +26,8 @@ FILES_TO_INCLUDE = [
     "config.py",
     "requirements.txt",
     "run.bat",
+    "run.sh",
+    "run.command",
     "package.py",
     "README.md",
     "LICENSE",

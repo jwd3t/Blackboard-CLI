@@ -2,6 +2,8 @@
 Cliente HTTP para interactuar con la API REST de Blackboard Ultra.
 Consume los endpoints internos para obtener cursos, carpetas, archivos, anuncios y calendario.
 """
+from __future__ import annotations
+
 import re
 import urllib.parse
 from pathlib import Path
