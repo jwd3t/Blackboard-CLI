@@ -31,9 +31,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [2.0.0] - 2026-09-22
 
-> 💡 **Nota del desarrollador: ¿Por qué el primer release es directamente la 2.0.0?**  
-> Porque en el desarrollo se avanzó tanto a puro instinto, café y cero control de versiones, que para cuando alguien por fin se acordó de hacer `git init`, el proyecto ya estaba en su prime, graduado con honores y con arquitectura digna de una versión 2.0.  
-> La legendaria versión 1.0 vive únicamente en nuestros corazones (y en carpetas olvidadas llamadas `proyecto_final_ahora_si_este_es_v2_final_final.zip`). 🚀
+> 💡 **Nota del desarrollador: El mito de la v1.0.0 y por qué arrancamos en la 2.0.0**  
+> La versión 1.0.0 existió... pero era fea con ganas: una terminal en blanco y negro sin piedad que descargaba absolutamente todo el semestre a la fuerza sin darte a elegir nada.  
+> En un ataque de inspiración (y cafeína), se rehizo todo el mismo día: interfaz visual pro con su logo, radar de evaluaciones, menús interactivos y la opción de elegir qué curso o semana descargar.  
+> ¿El resultado? La v1.0.0 se convirtió oficialmente en *lost media* el mismísimo día de su creación, porque el proyecto saltó de 1.0 a 2.0 en cuestión de horas. No quedó de otra que inaugurar el primer commit directamente como `v2.0.0`. 🚀
 
 ### ✨ Lanzamiento Inicial v2.0
 - **Cuadernos de Estudio para IA:** Estructuración automática de todo el contenido académico en carpetas organizadas y archivos Markdown listos para ser consumidos por modelos de IA (Claude, ChatGPT, Antigravity, Gemini).
