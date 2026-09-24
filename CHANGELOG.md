@@ -9,32 +9,29 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [2.1.1] - 2026-09-24
 
-### 🔧 Mejoras y Correcciones Menores (Polish)
-- **Lanzadores descriptivos por plataforma:** Se renombraron los archivos de inicio genéricos a `BlackboardCLI-v{VERSION}-{Plataforma}` (`BlackboardCLI-v2.1.1-Windows.bat`, `BlackboardCLI-v2.1.1-macOS.command` y `BlackboardCLI-v2.1.1-Linux.sh`) para una identificación inmediata y sin confusiones del archivo a ejecutar.
-- **Empaquetado completo:** Se incluyó `CHANGELOG.md` y los nuevos lanzadores en la lista de archivos distribuidos por `package.py` para que el ZIP compartido contenga siempre el historial de versiones.
-- **Salida elegante con `Ctrl+C`:** La interrupción por teclado (`KeyboardInterrupt`) en `cli.py` ahora muestra un mensaje amigable y sale limpiamente sin mostrar trazas de error de Python.
-- **Limpieza de sistema en Git:** Se agregaron `.DS_Store` y `Thumbs.db` al `.gitignore` para evitar archivos temporales generados por Finder (macOS) y el explorador de Windows.
-
----
-
-## [2.1.0] - 2026-09-24
-
 ### ✨ Añadido
-- **Verificación previa de archivos locales:** Antes de iniciar cualquier llamada de red o mostrar el spinner de descarga, se comprueba si el archivo ya existe físicamente en disco y tiene un tamaño válido (`> 0 bytes`).
-- **Caché persistente de descargas:** Nuevo archivo de caché local (`.session_data/downloads_cache.json`) que mapea URLs de Blackboard Ultra a sus nombres de archivo reales sin requerir peticiones HTTP intermedias.
-- **Rutas de origen en consola (Breadcrumbs):** Los logs ahora muestran la jerarquía de carpetas/semanas de origen (`format_display_path`), ej: `Semana 5 _ Storage › Recursos de aprendizaje ➔ archivo.pdf`.
+- **Verificación previa en disco:** Antes de emitir cualquier petición de red o mostrar el spinner de descarga, se comprueba si el archivo ya existe físicamente en disco y tiene un tamaño válido (`> 0 bytes`).
+- **Caché persistente de descargas:** Nuevo archivo de caché local (`.session_data/downloads_cache.json`) que mapea URLs de Blackboard Ultra a sus nombres de archivo reales, evitando consultas HTTP innecesarias.
 - **Diferenciación visual en consola:**
-  - `⚡` *(color atenuado)* para recursos que ya estaban descargados y al día.
+  - `⚡` *(color atenuado)* para recursos que ya estaban descargados previamente y al día (`ya descargado`).
   - `💾` *(color brillante)* para nuevos archivos descargados.
+- **Rutas de origen en consola (Breadcrumbs):** Los logs ahora muestran la jerarquía de carpetas/semanas de origen (`format_display_path`), ej: `Semana 5 _ Storage › Recursos de aprendizaje ➔ archivo.pdf`.
 - **Barra de progreso interactiva:** Integración de `Rich.Progress` con spinner animado, barra de progreso gráfica y contador de tiempo transcurrido en sincronizaciones por curso y sección.
-- **Soporte multiplataforma completo:** Scripts `run.sh` y `run.command` para ejecución nativa en macOS y Linux con detección de Python 3.10+, creación de `.venv` e instalación automática de dependencias.
+- **Lanzadores descriptivos por plataforma:** Se renombraron los scripts de inicio genéricos a `BlackboardCLI-v{VERSION}-{Plataforma}`:
+  - `BlackboardCLI-v2.1.1-Windows.bat` *(Windows)*
+  - `BlackboardCLI-v2.1.1-macOS.command` *(macOS)*
+  - `BlackboardCLI-v2.1.1-Linux.sh` *(Linux)*
+- **Soporte multiplataforma completo:** Detección automática de Python 3.10+, creación de entorno virtual `.venv` aislado e instalación desatendida de dependencias y Playwright Chromium tanto en macOS/Linux como en Windows.
+- **Salida elegante con `Ctrl+C`:** La interrupción por teclado (`KeyboardInterrupt`) en `cli.py` ahora muestra una despedida amigable y sale limpiamente sin mostrar trazas de error de Python.
+- **Empaquetado inteligente:** `package.py` ahora empaqueta dinámicamente según la versión actual, incluyendo automáticamente el `CHANGELOG.md` y los lanzadores de cada plataforma.
+- **Limpieza de sistema en Git:** Se agregaron `.DS_Store` y `Thumbs.db` al `.gitignore` para evitar archivos temporales generados por Finder (macOS) y el explorador de Windows.
 
 ### ⚡ Rendimiento
 - **0 peticiones redundantes:** La resincronización de un curso con materiales ya descargados pasa de tomar ~30 segundos a menos de 1 segundo, eliminando tráfico innecesario hacia los servidores de Blackboard.
 - **Normalización canónica de URLs:** Unificación y limpieza de entidades HTML (`&amp;` a `&`) y parámetros de consulta para evitar duplicidad de solicitudes en enlaces embebidos de `bbcswebdav`.
 
 ### 🐛 Corregido
-- **Duplicidad de logs y descargas por documento:** Eliminado el problema donde archivos como PDFs y Word se imprimían hasta 3 veces consecutivas debido a los bloques hijos internos de documentos Ultra (`ultradocumentbody`).
+- **Duplicidad de logs y descargas por documento:** Solucionado el problema donde archivos como PDFs y Word se imprimían hasta 3 veces consecutivas debido a los bloques hijos internos de documentos Ultra (`ultradocumentbody`).
 - **Descargas incompletas:** Detección de archivos corruptos o de 0 bytes para forzar su re-descarga limpia si fueron interrumpidos previamente.
 
 ---
@@ -53,3 +50,8 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Resumen general del ciclo:** Generación del archivo maestro `RESUMEN_SEMESTRE_IA.md` con el índice integral de asignaturas, evaluaciones pendientes y rutas de materiales.
 - **Empaquetado seguro (`package`):** Generador de archivos ZIP para compartir el proyecto sin incluir credenciales privadas, cookies ni materiales descargados.
 - **Lanzador automático en Windows:** Script `run.bat` con resolución de alias de Microsoft Store, creación automática de `.venv` e instalación de dependencias.
+
+---
+
+[2.1.1]: https://github.com/jwd3t/Blackboard-CLI/compare/2.0.0...2.1.1
+[2.0.0]: https://github.com/jwd3t/Blackboard-CLI/releases/tag/2.0.0
