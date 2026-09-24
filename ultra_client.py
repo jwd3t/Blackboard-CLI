@@ -5,6 +5,7 @@ Consume los endpoints internos para obtener cursos, carpetas, archivos, anuncios
 from __future__ import annotations
 
 import re
+import mimetypes
 import urllib.parse
 from pathlib import Path
 import html2text
@@ -20,12 +21,18 @@ def get_filename_from_cd(cd_header: str) -> str | None:
     """Extrae el nombre de archivo real del encabezado Content-Disposition."""
     if not cd_header:
         return None
-    m = re.search(r"filename\*=UTF-8''([^;]+)", cd_header, re.IGNORECASE)
+    # 1. RFC 5987 / 6266 filename*
+    m = re.search(r"filename\*=(?:UTF-8''|utf-8'')([^;]+)", cd_header, re.IGNORECASE)
     if m:
-        return urllib.parse.unquote(m.group(1).strip("\"'"))
-    m = re.search(r'filename="?([^";]+)"?', cd_header, re.IGNORECASE)
+        return urllib.parse.unquote(m.group(1).strip("\"' \t"))
+    # 2. filename entre comillas
+    m = re.search(r'filename="([^"]+)"', cd_header, re.IGNORECASE)
     if m:
-        return urllib.parse.unquote(m.group(1).strip("\"'"))
+        return urllib.parse.unquote(m.group(1).strip())
+    # 3. filename sin comillas
+    m = re.search(r'filename=([^;\s]+)', cd_header, re.IGNORECASE)
+    if m:
+        return urllib.parse.unquote(m.group(1).strip("\"' \t"))
     return None
 
 
@@ -249,16 +256,38 @@ class UltraClient:
 
             # Extraer enlaces embebidos de lecturas y archivos dentro del HTML del documento
             embedded_files = []
+            seen_urls = set()
             if raw_body:
                 soup = BeautifulSoup(raw_body, "html.parser")
                 for a in soup.find_all("a", href=True):
-                    href = a["href"]
-                    text = a.get_text().strip()
-                    # Ignorar banners de imagen decorativos
-                    if "bbcswebdav" in href and a.get("data-bbtype") != "image" and text:
+                    href = a["href"].strip()
+                    if not href or href in seen_urls:
+                        continue
+                    if "bbcswebdav" in href or "/xid-" in href:
+                        seen_urls.add(href)
+                        # Buscar el mejor nombre o texto descriptivo disponible
+                        text = (
+                            a.get_text().strip() or
+                            a.get("title", "").strip() or
+                            a.get("aria-label", "").strip() or
+                            a.get("download", "").strip() or
+                            ""
+                        )
+                        if not text and a.find("img"):
+                            text = a.find("img").get("alt", "").strip()
                         embedded_files.append({
                             "url": href,
-                            "text": text
+                            "text": text or "recurso"
+                        })
+
+                # Extraer cualquier otra URL de bbcswebdav encontrada en el HTML (incluyendo fuentes de bloques Ultra)
+                for match_url in re.findall(r'https?://[^\s"\'<>)]+bbcswebdav[^\s"\'<>)]+|/bbcswebdav/[^\s"\'<>)]+', raw_body):
+                    cleaned_url = match_url.rstrip(".,;)\"'")
+                    if cleaned_url not in seen_urls:
+                        seen_urls.add(cleaned_url)
+                        embedded_files.append({
+                            "url": cleaned_url,
+                            "text": "recurso"
                         })
 
             external_url = item.get("contentHandler", {}).get("url")
@@ -314,31 +343,64 @@ class UltraClient:
             print(f"Error al descargar {dest_path.name}: {e}")
         return False
 
-    def download_embedded_file(self, url: str, dest_dir, fallback_name: str) -> str | None:
+    def download_embedded_file(self, url: str, dest_dir, fallback_name: str = "documento") -> str | None:
         """
         Descarga una lectura o recurso embebido (ej: bbcswebdav) detectando
         su nombre de archivo real desde los encabezados HTTP.
-        Retorna el nombre del archivo descargado o None si falló.
+        Retorna el nombre del archivo descargado o None si falló o si es un recurso ignorado (ej. imagen/banner).
         """
         dest_dir.mkdir(parents=True, exist_ok=True)
         try:
             with self.client.stream("GET", url, follow_redirects=True) as resp:
                 if resp.status_code != 200:
                     return None
+
+                ct = resp.headers.get("content-type", "").lower()
+                clean_ct = ct.split(";")[0].strip()
+
+                # Si es una página web / redirect de login o error HTML, omitir
+                if clean_ct == "text/html":
+                    return None
+
+                # Si es una imagen o video decorativo (como el banner de la cabecera), omitir
+                if clean_ct.startswith("image/") or clean_ct.startswith("video/"):
+                    return None
+
                 cd = resp.headers.get("content-disposition", "")
                 real_name = get_filename_from_cd(cd)
+
                 if not real_name:
-                    ct = resp.headers.get("content-type", "")
-                    ext = ".pdf" if "pdf" in ct else ""
-                    real_name = fallback_name + ext
+                    # Mapeo de tipos MIME comunes de documentos
+                    mimes = {
+                        "application/pdf": ".pdf",
+                        "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+                        "application/vnd.ms-powerpoint": ".ppt",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+                        "application/msword": ".doc",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+                        "application/vnd.ms-excel": ".xls",
+                        "application/zip": ".zip",
+                        "application/x-zip-compressed": ".zip",
+                        "application/x-rar-compressed": ".rar",
+                        "text/plain": ".txt",
+                        "text/csv": ".csv",
+                    }
+                    ext = mimes.get(clean_ct) or mimetypes.guess_extension(clean_ct) or ""
 
-                # Sanitizar caracteres ilegales en Windows
+                    if Path(fallback_name).suffix:
+                        real_name = fallback_name
+                    else:
+                        real_name = (fallback_name or "documento") + ext
+
+                # Sanitizar caracteres ilegales en archivos
                 real_name = re.sub(r'[\\/*?:"<>|]', "_", real_name).strip()
+                if not real_name:
+                    return None
 
-                # Omitir videos pesados o imágenes de decoración
-                ignored_exts = {".mp4", ".mov", ".avi", ".mkv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+                # Omitir imágenes y videos por extensión
+                ignored_exts = {".mp4", ".mov", ".avi", ".mkv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico"}
                 ext_check = Path(real_name).suffix.lower()
-                if ext_check in ignored_exts:
+                if ext_check in ignored_exts or not ext_check:
                     return None
 
                 final_path = dest_dir / real_name

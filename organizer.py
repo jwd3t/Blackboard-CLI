@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import json
+import urllib.parse
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser as date_parser
@@ -291,25 +292,49 @@ class CourseNotebookOrganizer:
                             })
 
             # 2. Si tiene lecturas o recursos embebidos (ej: documentos de Blackboard con links bbcswebdav)
-            embedded_files = node.get("embedded_files", [])
+            embedded_files = list(node.get("embedded_files", []))
+            seen_emb_urls = {emb.get("url") for emb in embedded_files if emb.get("url")}
+
+            # Asegurar que cualquier enlace bbcswebdav presente en description_md o raw_body se incluya
+            desc_md = node.get("description_md", "").strip()
+            raw_body = node.get("raw_body", "")
+            for text_src in (desc_md, raw_body):
+                if not text_src:
+                    continue
+                for match_url in re.findall(r'https?://[^\s"\'<>)]+bbcswebdav[^\s"\'<>)]+|/bbcswebdav/[^\s"\'<>)]+', text_src):
+                    cleaned_url = match_url.rstrip(".,;)\"'")
+                    if cleaned_url not in seen_emb_urls:
+                        seen_emb_urls.add(cleaned_url)
+                        embedded_files.append({
+                            "url": cleaned_url,
+                            "text": "recurso"
+                        })
+
+            downloaded_embedded_map = {}  # url -> saved_file_name
+            ignored_banner_urls = set()
+
             for emb in embedded_files:
                 emb_url = emb.get("url")
                 emb_text = sanitize_name(emb.get("text", "lectura"))
                 dest_dir = info_dir if is_info else target_folder
                 if emb_url:
                     if progress_callback:
-                        progress_callback("action", f"[{course_name[:25]}] 📖 Descargando lectura: {emb_text}...")
+                        progress_callback("action", f"[{course_name[:25]}] 📖 Descargando recurso: {emb_text}...")
 
                     saved_name = self.client.download_embedded_file(emb_url, dest_dir, fallback_name=emb_text)
                     if saved_name:
+                        downloaded_embedded_map[emb_url] = saved_name
                         if progress_callback:
-                            progress_callback("log", f"  📖 Lectura guardada: {saved_name}")
+                            progress_callback("log", f"  📖 Recurso guardado: {saved_name}")
                         downloaded.append({
-                            "title": emb_text,
+                            "title": emb_text if emb_text not in ["recurso", "lectura"] else saved_name,
                             "file_name": saved_name,
                             "path": str((dest_dir / saved_name).relative_to(OUTPUT_DIR)),
                             "is_info_general": (dest_dir == info_dir)
                         })
+                    else:
+                        # Fue ignorado (imagen/banner decorativo o no descargable)
+                        ignored_banner_urls.add(emb_url)
 
             # 3. Si es un enlace externo (ej: repositorio de GitHub o herramienta)
             ext_url = node.get("external_url")
@@ -329,23 +354,52 @@ class CourseNotebookOrganizer:
                     pass
 
             # 4. Si el documento contiene explicaciones o rutas de aprendizaje en texto
-            desc_md = node.get("description_md", "").strip()
-            if desc_md and len(desc_md) > 30 and ("document" in handler.lower() or "recurso" in title.lower() or "guia" in title.lower() or "ruta" in title.lower()):
+            if desc_md and ("document" in handler.lower() or "recurso" in title.lower() or "guia" in title.lower() or "ruta" in title.lower() or downloaded_embedded_map):
                 dest_dir = info_dir if is_info else target_folder
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 doc_name = "Recursos_de_aprendizaje.md" if sanitized_title.lower() == "ultradocumentbody" else f"{sanitized_title}.md"
                 doc_path = dest_dir / doc_name
-                try:
-                    with open(doc_path, "w", encoding="utf-8") as f:
-                        f.write(f"# 📄 {title if sanitized_title.lower() != 'ultradocumentbody' else 'Documento de Lectura'}\n\n{desc_md}\n")
-                    downloaded.append({
-                        "title": title,
-                        "file_name": doc_name,
-                        "path": str(doc_path.relative_to(OUTPUT_DIR)),
-                        "is_info_general": (dest_dir == info_dir)
-                    })
-                except Exception:
-                    pass
+
+                # Limpiar desc_md reemplazando URLs de archivos descargados por enlaces relativos locales
+                clean_md = desc_md
+                for emb_url, saved_name in downloaded_embedded_map.items():
+                    quoted_name = urllib.parse.quote(saved_name)
+                    # Reemplazar enlaces en markdown [](url) o [texto](url) por el nombre del archivo local
+                    pattern = re.compile(r'\[([^\]]*)\]\(' + re.escape(emb_url) + r'\)')
+                    clean_md = pattern.sub(f'📄 [{saved_name}](./{quoted_name})', clean_md)
+                    clean_md = clean_md.replace(emb_url, f'./{quoted_name}')
+
+                # Limpiar enlaces a banners de imágenes ignorados que hayan quedado como [](url)
+                for banner_url in ignored_banner_urls:
+                    clean_md = re.sub(r'\[([^\]]*)\]\(' + re.escape(banner_url) + r'\)\s*', '', clean_md)
+                    clean_md = clean_md.replace(banner_url, '')
+
+                # Verificar si tras limpiar queda texto explicativo real o solo enlaces
+                text_only = re.sub(r'\[([^\]]*)\]\([^)]+\)', '', clean_md)
+                text_only = re.sub(r'https?://\S+', '', text_only)
+                text_only = re.sub(r'[📄#\*\-\s\n\r]', '', text_only)
+
+                # Si solo había enlaces y ningún texto explicativo, estructurarlo limpiamente
+                if len(text_only) < 15 and downloaded_embedded_map:
+                    file_links = "\n".join([f"- 📄 [{name}](./{urllib.parse.quote(name)})" for name in downloaded_embedded_map.values()])
+                    content_to_write = f"# 📄 {title if sanitized_title.lower() != 'ultradocumentbody' else 'Recursos de Aprendizaje'}\n\n### 📚 Materiales de estudio:\n{file_links}\n"
+                elif clean_md.strip():
+                    content_to_write = f"# 📄 {title if sanitized_title.lower() != 'ultradocumentbody' else 'Documento de Lectura'}\n\n{clean_md.strip()}\n"
+                else:
+                    content_to_write = ""
+
+                if content_to_write:
+                    try:
+                        with open(doc_path, "w", encoding="utf-8") as f:
+                            f.write(content_to_write)
+                        downloaded.append({
+                            "title": title,
+                            "file_name": doc_name,
+                            "path": str(doc_path.relative_to(OUTPUT_DIR)),
+                            "is_info_general": (dest_dir == info_dir)
+                        })
+                    except Exception:
+                        pass
 
             # 5. Si es carpeta o módulo con hijos, recorrer recursivamente creando la subcarpeta
             if is_folder and children:
