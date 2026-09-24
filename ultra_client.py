@@ -5,6 +5,8 @@ Consume los endpoints internos para obtener cursos, carpetas, archivos, anuncios
 from __future__ import annotations
 
 import re
+import html
+import json
 import mimetypes
 import urllib.parse
 from pathlib import Path
@@ -13,7 +15,7 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup
 
-from config import BASE_URL
+from config import BASE_URL, DOWNLOADS_CACHE_FILE, SUPPORTED_EXTENSIONS
 from auth import get_stored_cookies
 
 
@@ -58,6 +60,76 @@ class UltraClient:
         self.html_converter = html2text.HTML2Text()
         self.html_converter.ignore_links = False
         self.html_converter.body_width = 0
+        self.downloads_cache: dict[str, str] = {}
+        self._load_cache()
+
+    def _load_cache(self):
+        """Carga la correspondencia URL -> archivo descargado desde la sesión local."""
+        if DOWNLOADS_CACHE_FILE.exists():
+            try:
+                with open(DOWNLOADS_CACHE_FILE, "r", encoding="utf-8") as f:
+                    self.downloads_cache = json.load(f)
+            except Exception:
+                self.downloads_cache = {}
+        else:
+            self.downloads_cache = {}
+
+    def _save_cache(self):
+        """Guarda la caché persistente de archivos descargados."""
+        try:
+            DOWNLOADS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(DOWNLOADS_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.downloads_cache, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def check_existing_file(self, url: str, dest_dir: Path, fallback_name: str = "") -> str | None:
+        """
+        Verifica si un recurso ya fue descargado previamente en dest_dir sin realizar peticiones HTTP.
+        Retorna el nombre del archivo si ya existe y tiene tamaño > 0, o None si debe descargarse.
+        """
+        if not url:
+            return None
+
+        canon_url = html.unescape(url).split("?")[0].rstrip("/")
+
+        # 1. Verificar si la URL ya está registrada en la caché persistente
+        cached_name = self.downloads_cache.get(canon_url)
+        if cached_name:
+            target = dest_dir / cached_name
+            if target.exists() and target.stat().st_size > 0:
+                return cached_name
+
+        # 2. Si fallback_name ya incluye una extensión soportada y existe en el destino
+        clean_fallback = re.sub(r'[\\/*?:"<>|]', "_", fallback_name).strip()
+        fallback_ext = Path(clean_fallback).suffix.lower()
+        if fallback_ext in SUPPORTED_EXTENSIONS:
+            target = dest_dir / clean_fallback
+            if target.exists() and target.stat().st_size > 0:
+                self.downloads_cache[canon_url] = clean_fallback
+                self._save_cache()
+                return clean_fallback
+
+        # 3. Si la URL misma termina con un nombre de archivo con extensión válida
+        url_cand = re.sub(r'[\\/*?:"<>|]', "_", urllib.parse.unquote(canon_url.split("/")[-1])).strip()
+        url_ext = Path(url_cand).suffix.lower()
+        if url_ext in SUPPORTED_EXTENSIONS:
+            target = dest_dir / url_cand
+            if target.exists() and target.stat().st_size > 0:
+                self.downloads_cache[canon_url] = url_cand
+                self._save_cache()
+                return url_cand
+
+        # 4. Si en dest_dir ya existe un archivo con el mismo stem/título
+        if clean_fallback and clean_fallback.lower() not in ["recurso", "lectura", "documento"]:
+            for ext in SUPPORTED_EXTENSIONS:
+                cand_path = dest_dir / f"{clean_fallback}{ext}"
+                if cand_path.exists() and cand_path.stat().st_size > 0:
+                    self.downloads_cache[canon_url] = cand_path.name
+                    self._save_cache()
+                    return cand_path.name
+
+        return None
 
     def clean_html(self, html_content: str | None) -> str:
         """Convierte contenido HTML a Markdown limpio para la IA."""
@@ -256,15 +328,19 @@ class UltraClient:
 
             # Extraer enlaces embebidos de lecturas y archivos dentro del HTML del documento
             embedded_files = []
-            seen_urls = set()
+            seen_canonical = set()
             if raw_body:
                 soup = BeautifulSoup(raw_body, "html.parser")
                 for a in soup.find_all("a", href=True):
-                    href = a["href"].strip()
-                    if not href or href in seen_urls:
+                    raw_href = html.unescape(a["href"].strip())
+                    if not raw_href:
                         continue
-                    if "bbcswebdav" in href or "/xid-" in href:
-                        seen_urls.add(href)
+                    if "bbcswebdav" in raw_href or "/xid-" in raw_href:
+                        canon = raw_href.split("?")[0].rstrip("/")
+                        if canon in seen_canonical:
+                            continue
+                        seen_canonical.add(canon)
+
                         # Buscar el mejor nombre o texto descriptivo disponible
                         text = (
                             a.get_text().strip() or
@@ -276,17 +352,18 @@ class UltraClient:
                         if not text and a.find("img"):
                             text = a.find("img").get("alt", "").strip()
                         embedded_files.append({
-                            "url": href,
+                            "url": raw_href,
                             "text": text or "recurso"
                         })
 
                 # Extraer cualquier otra URL de bbcswebdav encontrada en el HTML (incluyendo fuentes de bloques Ultra)
                 for match_url in re.findall(r'https?://[^\s"\'<>)]+bbcswebdav[^\s"\'<>)]+|/bbcswebdav/[^\s"\'<>)]+', raw_body):
-                    cleaned_url = match_url.rstrip(".,;)\"'")
-                    if cleaned_url not in seen_urls:
-                        seen_urls.add(cleaned_url)
+                    raw_match = html.unescape(match_url.rstrip(".,;)\"'"))
+                    canon = raw_match.split("?")[0].rstrip("/")
+                    if canon not in seen_canonical:
+                        seen_canonical.add(canon)
                         embedded_files.append({
-                            "url": cleaned_url,
+                            "url": raw_match,
                             "text": "recurso"
                         })
 
@@ -326,7 +403,7 @@ class UltraClient:
 
         return tree
 
-    def download_file(self, download_url: str, dest_path) -> bool:
+    def download_file(self, download_url: str, dest_path: Path) -> bool:
         """Descarga un archivo si no existe ya localmente."""
         if dest_path.exists() and dest_path.stat().st_size > 0:
             return True  # Ya descargado
@@ -338,18 +415,28 @@ class UltraClient:
                     with open(dest_path, "wb") as f:
                         for chunk in resp.iter_bytes(chunk_size=8192):
                             f.write(chunk)
+                    canon_url = html.unescape(download_url).split("?")[0].rstrip("/")
+                    self.downloads_cache[canon_url] = dest_path.name
+                    self._save_cache()
                     return True
         except Exception as e:
             print(f"Error al descargar {dest_path.name}: {e}")
         return False
 
-    def download_embedded_file(self, url: str, dest_dir, fallback_name: str = "documento") -> str | None:
+    def download_embedded_file(self, url: str, dest_dir: Path, fallback_name: str = "documento") -> str | None:
         """
         Descarga una lectura o recurso embebido (ej: bbcswebdav) detectando
         su nombre de archivo real desde los encabezados HTTP.
         Retorna el nombre del archivo descargado o None si falló o si es un recurso ignorado (ej. imagen/banner).
         """
         dest_dir.mkdir(parents=True, exist_ok=True)
+        canon_url = html.unescape(url).split("?")[0].rstrip("/")
+
+        # 1. Comprobar si ya existe localmente antes de hacer cualquier petición HTTP
+        existing = self.check_existing_file(url, dest_dir, fallback_name)
+        if existing:
+            return existing
+
         try:
             with self.client.stream("GET", url, follow_redirects=True) as resp:
                 if resp.status_code != 200:
@@ -404,13 +491,18 @@ class UltraClient:
                     return None
 
                 final_path = dest_dir / real_name
-                # Si ya existe con tamaño mayor a 0, no re-descargar
+                # Si ya existe con tamaño mayor a 0, registrar en caché y no re-descargar
                 if final_path.exists() and final_path.stat().st_size > 0:
+                    self.downloads_cache[canon_url] = real_name
+                    self._save_cache()
                     return real_name
 
                 with open(final_path, "wb") as f:
                     for chunk in resp.iter_bytes(chunk_size=8192):
                         f.write(chunk)
+
+                self.downloads_cache[canon_url] = real_name
+                self._save_cache()
                 return real_name
         except Exception as e:
             print(f"Error al descargar recurso embebido {fallback_name}: {e}")

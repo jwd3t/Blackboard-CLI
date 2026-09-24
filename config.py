@@ -13,6 +13,7 @@ BASE_URL = "https://aulavirtual.upc.edu.pe"
 BASE_DIR = Path(__file__).resolve().parent
 SESSION_DIR = BASE_DIR / ".session_data"
 COOKIES_FILE = SESSION_DIR / "cookies.json"
+DOWNLOADS_CACHE_FILE = SESSION_DIR / "downloads_cache.json"
 OUTPUT_DIR = BASE_DIR / "cuadernos"
 
 # Estructura del cuaderno por curso

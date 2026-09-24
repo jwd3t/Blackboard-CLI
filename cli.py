@@ -404,20 +404,31 @@ def _run_sync_all(organizer, courses):
 
 
 def _run_sync_single_course(organizer, selected_course, target_section=None):
-    """Ejecuta la sincronización de un curso individual o una unidad/semana específica."""
+    """Ejecuta la sincronización de un curso individual o una unidad/semana específica con barra de progreso."""
     c_name = selected_course["name"].replace(" - Virtual", "").replace(" - Presencial", "")
     target_label = target_section["title"] if target_section else "Todo el curso"
     
     console.print(f"\n[bold cyan]Sincronizando:[/bold cyan] [bold white]{c_name}[/bold white]")
     console.print(f"[bold cyan]Alcance:[/bold cyan] [yellow]{target_label}[/yellow]\n")
 
-    def callback(event_type: str, *args):
-        if event_type == "action":
-            console.print(f"[dim cyan]⚡[/dim cyan] {args[0]}")
-        elif event_type == "log":
-            console.print(f"   [dim]↳[/dim] {args[0]}")
+    with Progress(
+        SpinnerColumn(style="cyan"),
+        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+        BarColumn(bar_width=35, style="grey23", complete_style="bright_cyan"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False
+    ) as progress:
+        sync_task = progress.add_task(f"Iniciando {target_label}...", total=None)
 
-    c_info = organizer.sync_course(selected_course, target_section=target_section, progress_callback=callback)
+        def callback(event_type: str, *args):
+            if event_type == "action":
+                progress.update(sync_task, description=f"[bold green]{args[0]}[/bold green]")
+            elif event_type == "log":
+                console.print(f"[bold cyan]│[/bold cyan]  {args[0]}")
+
+        c_info = organizer.sync_course(selected_course, target_section=target_section, progress_callback=callback)
+        progress.update(sync_task, description=f"[bold green]✔ ¡{target_label} completado![/bold green]")
 
     console.print(f"\n[bold green]✔ ¡Sincronización de {c_name} finalizada con éxito![/bold green]")
     console.print(f"📁 Cuaderno actualizado en: [bold cyan]{c_info['dir']}[/bold cyan]")

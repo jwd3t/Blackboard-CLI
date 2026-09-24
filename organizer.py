@@ -6,6 +6,7 @@ en carpetas limpias y genera archivos Markdown optimizados para el estudiante y 
 from __future__ import annotations
 
 import re
+import html
 import json
 import urllib.parse
 from pathlib import Path
@@ -50,9 +51,24 @@ def is_info_general(title: str, filename: str = "") -> bool:
     return any(kw in text for kw in KEYWORDS_INFO_GENERAL)
 
 
+def format_display_path(dest_dir: Path, course_dir: Path | None, current_relative_path: str) -> str:
+    """Genera una ruta amigable y concisa (ej: Semana 5 › Recursos) para mostrar en consola."""
+    if course_dir:
+        try:
+            rel = dest_dir.relative_to(course_dir)
+            parts = [p for p in rel.parts if p not in ["02_MATERIALES_Y_CLASES", "00_INFORMACION_GENERAL"]]
+            if not parts:
+                return "00_INFO_GENERAL" if "00_INFORMACION_GENERAL" in str(rel) else "Materiales"
+            return " › ".join(parts)
+        except Exception:
+            pass
+    return current_relative_path.replace("/", " › ") or "Materiales"
+
+
 class CourseNotebookOrganizer:
     def __init__(self, client: UltraClient):
         self.client = client
+        self._processed_course_files: set[str] = set()
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     def sync_all_courses(self, progress_callback=None) -> dict:
@@ -90,6 +106,7 @@ class CourseNotebookOrganizer:
         Sincroniza y organiza un curso en formato cuaderno.
         Si se especifica target_section, sincroniza únicamente esa unidad o semana.
         """
+        self._processed_course_files = set()
         course_name = course.get("name", "Curso")
         course_code = course.get("course_id", "")
         folder_name = sanitize_name(f"[{course_code}] {course_name}" if course_code else course_name)
@@ -140,7 +157,8 @@ class CourseNotebookOrganizer:
                 info_dir=dir_info,
                 current_relative_path=init_rel,
                 progress_callback=progress_callback,
-                course_name=course_name
+                course_name=course_name,
+                course_dir=course_dir
             )
         else:
             if progress_callback:
@@ -151,7 +169,8 @@ class CourseNotebookOrganizer:
                 materials_dir=dir_materials,
                 info_dir=dir_info,
                 progress_callback=progress_callback,
-                course_name=course_name
+                course_name=course_name,
+                course_dir=course_dir
             )
 
         # 4. Generar o actualizar la portada y cuaderno resumen del curso
@@ -240,7 +259,8 @@ class CourseNotebookOrganizer:
         info_dir: Path,
         current_relative_path: str = "",
         progress_callback=None,
-        course_name: str = ""
+        course_name: str = "",
+        course_dir: Path | None = None
     ) -> list[dict]:
         """
         Recorre los contenidos. Coloca los archivos directamente en la carpeta actual
@@ -274,16 +294,37 @@ class CourseNotebookOrganizer:
                 if ext in SUPPORTED_EXTENSIONS or not ext:
                     dest_dir = info_dir if (is_info or is_info_general("", file_name)) else target_folder
                     dest_file = dest_dir / file_name
+                    dest_file_key = str(dest_file.resolve())
+
+                    # Evitar procesar o loguear el mismo archivo múltiples veces
+                    if dest_file_key in self._processed_course_files:
+                        continue
+
+                    display_path = format_display_path(dest_dir, course_dir, current_relative_path)
+
+                    # Si el archivo ya existe en disco con contenido, evitar la petición de red
+                    if dest_file.exists() and dest_file.stat().st_size > 0:
+                        self._processed_course_files.add(dest_file_key)
+                        if progress_callback:
+                            progress_callback("log", f"⚡ [dim cyan]{display_path}[/dim cyan] ➔ [dim]{file_name}[/dim] [dim green](ya descargado)[/dim green]")
+                        downloaded.append({
+                            "title": title,
+                            "file_name": file_name,
+                            "path": str(dest_file.relative_to(OUTPUT_DIR)),
+                            "is_info_general": (dest_dir == info_dir)
+                        })
+                        continue
+
                     download_url = att.get("downloadUrl")
                     if download_url:
-                        cat_label = "00_INFO_GENERAL" if dest_dir == info_dir else "02_MATERIALES"
                         if progress_callback:
-                            progress_callback("action", f"[{course_name[:25]}] ⬇️ Descargando: {file_name} -> {cat_label}")
+                            progress_callback("action", f"[{course_name[:25]}] ⬇️ {file_name}")
 
                         success = self.client.download_file(download_url, dest_file)
                         if success:
+                            self._processed_course_files.add(dest_file_key)
                             if progress_callback:
-                                progress_callback("log", f"  💾 Guardado: {file_name} ({cat_label})")
+                                progress_callback("log", f"💾 [dim cyan]{display_path}[/dim cyan] ➔ [bold white]{file_name}[/bold white]")
                             downloaded.append({
                                 "title": title,
                                 "file_name": file_name,
@@ -293,20 +334,21 @@ class CourseNotebookOrganizer:
 
             # 2. Si tiene lecturas o recursos embebidos (ej: documentos de Blackboard con links bbcswebdav)
             embedded_files = list(node.get("embedded_files", []))
-            seen_emb_urls = {emb.get("url") for emb in embedded_files if emb.get("url")}
+            seen_canonical = {html.unescape(emb.get("url", "")).split("?")[0].rstrip("/") for emb in embedded_files if emb.get("url")}
 
-            # Asegurar que cualquier enlace bbcswebdav presente en description_md o raw_body se incluya
+            # Asegurar que cualquier enlace bbcswebdav presente en description_md o raw_body se incluya sin duplicados
             desc_md = node.get("description_md", "").strip()
             raw_body = node.get("raw_body", "")
             for text_src in (desc_md, raw_body):
                 if not text_src:
                     continue
                 for match_url in re.findall(r'https?://[^\s"\'<>)]+bbcswebdav[^\s"\'<>)]+|/bbcswebdav/[^\s"\'<>)]+', text_src):
-                    cleaned_url = match_url.rstrip(".,;)\"'")
-                    if cleaned_url not in seen_emb_urls:
-                        seen_emb_urls.add(cleaned_url)
+                    raw_match = html.unescape(match_url.rstrip(".,;)\"'"))
+                    canon = raw_match.split("?")[0].rstrip("/")
+                    if canon not in seen_canonical:
+                        seen_canonical.add(canon)
                         embedded_files.append({
-                            "url": cleaned_url,
+                            "url": raw_match,
                             "text": "recurso"
                         })
 
@@ -317,24 +359,54 @@ class CourseNotebookOrganizer:
                 emb_url = emb.get("url")
                 emb_text = sanitize_name(emb.get("text", "lectura"))
                 dest_dir = info_dir if is_info else target_folder
-                if emb_url:
-                    if progress_callback:
-                        progress_callback("action", f"[{course_name[:25]}] 📖 Descargando recurso: {emb_text}...")
+                if not emb_url:
+                    continue
 
-                    saved_name = self.client.download_embedded_file(emb_url, dest_dir, fallback_name=emb_text)
-                    if saved_name:
-                        downloaded_embedded_map[emb_url] = saved_name
+                display_path = format_display_path(dest_dir, course_dir, current_relative_path)
+
+                # 1. Verificar si ya fue descargado previamente (0 peticiones de red)
+                existing_name = self.client.check_existing_file(emb_url, dest_dir, fallback_name=emb_text)
+                if existing_name:
+                    dest_file_key = str((dest_dir / existing_name).resolve())
+                    downloaded_embedded_map[emb_url] = existing_name
+
+                    if dest_file_key not in self._processed_course_files:
+                        self._processed_course_files.add(dest_file_key)
                         if progress_callback:
-                            progress_callback("log", f"  📖 Recurso guardado: {saved_name}")
+                            progress_callback("log", f"⚡ [dim cyan]{display_path}[/dim cyan] ➔ [dim]{existing_name}[/dim] [dim green](ya descargado)[/dim green]")
                         downloaded.append({
-                            "title": emb_text if emb_text not in ["recurso", "lectura"] else saved_name,
-                            "file_name": saved_name,
-                            "path": str((dest_dir / saved_name).relative_to(OUTPUT_DIR)),
+                            "title": emb_text if emb_text not in ["recurso", "lectura"] else existing_name,
+                            "file_name": existing_name,
+                            "path": str((dest_dir / existing_name).relative_to(OUTPUT_DIR)),
                             "is_info_general": (dest_dir == info_dir)
                         })
-                    else:
-                        # Fue ignorado (imagen/banner decorativo o no descargable)
-                        ignored_banner_urls.add(emb_url)
+                    continue
+
+                # 2. Si no está en disco, realizar la petición y descarga
+                if progress_callback:
+                    progress_callback("action", f"[{course_name[:25]}] 📖 Descargando: {emb_text}...")
+
+                saved_name = self.client.download_embedded_file(emb_url, dest_dir, fallback_name=emb_text)
+                if saved_name:
+                    downloaded_embedded_map[emb_url] = saved_name
+                    dest_file_key = str((dest_dir / saved_name).resolve())
+
+                    # Evitar procesar o loguear el mismo archivo múltiples veces en el mismo destino
+                    if dest_file_key in self._processed_course_files:
+                        continue
+                    self._processed_course_files.add(dest_file_key)
+
+                    if progress_callback:
+                        progress_callback("log", f"💾 [dim cyan]{display_path}[/dim cyan] ➔ [bold white]{saved_name}[/bold white]")
+                    downloaded.append({
+                        "title": emb_text if emb_text not in ["recurso", "lectura"] else saved_name,
+                        "file_name": saved_name,
+                        "path": str((dest_dir / saved_name).relative_to(OUTPUT_DIR)),
+                        "is_info_general": (dest_dir == info_dir)
+                    })
+                else:
+                    # Fue ignorado (imagen/banner decorativo o no descargable)
+                    ignored_banner_urls.add(emb_url)
 
             # 3. Si es un enlace externo (ej: repositorio de GitHub o herramienta)
             ext_url = node.get("external_url")
@@ -410,7 +482,8 @@ class CourseNotebookOrganizer:
                     info_dir=info_dir,
                     current_relative_path=next_rel,
                     progress_callback=progress_callback,
-                    course_name=course_name
+                    course_name=course_name,
+                    course_dir=course_dir
                 )
                 downloaded.extend(sub_downloaded)
 
