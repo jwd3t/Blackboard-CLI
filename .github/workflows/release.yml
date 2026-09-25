@@ -1,0 +1,42 @@
+name: Publicar Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Empaquetar ZIP con package.py
+        run: python package.py
+
+      - name: Obtener versión del proyecto
+        id: get_version
+        run: |
+          VERSION=$(python -c "from config import VERSION; print(VERSION)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Crear Release y adjuntar ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: Blackboard CLI v${{ steps.get_version.outputs.version }}
+          files: Blackboard-CLI-v*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true

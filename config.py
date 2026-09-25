@@ -4,7 +4,7 @@ Configuraciones globales para el sincronizador de Blackboard Ultra UPC.
 from pathlib import Path
 
 # Versión del software
-VERSION = "2.1.1"
+VERSION = "2.2.0"
 
 # URL base del aula virtual
 BASE_URL = "https://aulavirtual.upc.edu.pe"
@@ -21,12 +21,13 @@ DIR_INFO_GENERAL = "00_INFORMACION_GENERAL"
 DIR_EVALUACIONES = "01_EVALUACIONES_Y_EXAMENES"
 DIR_MATERIALES = "02_MATERIALES_Y_CLASES"
 DIR_ANUNCIOS = "03_ANUNCIOS"
+DIR_GEMINI_NOTEBOOK = "gemini_notebook"  # Carpeta plana unificada para Gemini Notebook / NotebookLM
 
 # Palabras clave para clasificar automáticamente archivos en 00_INFORMACION_GENERAL
 KEYWORDS_INFO_GENERAL = [
     "silabo", "sílabo", "syllabus",
     "plan calendario", "calendario", "cronograma",
-    "guia del estudiante", "guía del estudiante", "guia", "guía",
+    "guia del estudiante", "guía del estudiante",
     "reglamento", "presentacion del curso", "presentación del curso",
     "formula", "fórmula de evaluacion", "evaluaciones del curso"
 ]

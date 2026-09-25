@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 import html
 import json
+import shutil
 import urllib.parse
 from pathlib import Path
 from datetime import datetime
@@ -19,10 +20,111 @@ from config import (
     DIR_EVALUACIONES,
     DIR_MATERIALES,
     DIR_ANUNCIOS,
+    DIR_GEMINI_NOTEBOOK,
     KEYWORDS_INFO_GENERAL,
     SUPPORTED_EXTENSIONS,
 )
 from ultra_client import UltraClient
+
+
+def parse_unit_number(text: str) -> int | None:
+    """Detecta números de unidad arábigos y romanos."""
+    match = re.search(r'(?i)(?<![a-zA-Z])(?:unidad|unit|u)\s*([0-9]+|[IVXLCDM]+)(?![a-zA-Z0-9])', text)
+    if not match:
+        return None
+    val = match.group(1).upper()
+    if val.isdigit():
+        return int(val)
+    romans = {'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10}
+    return romans.get(val)
+
+
+def parse_week_number(text: str) -> int | None:
+    """Detecta semanas."""
+    match = re.search(r'(?i)(?<![a-zA-Z])(?:semana|sem\.?|s|week)\s*([0-9]+)(?![a-zA-Z0-9])', text)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = None) -> int:
+    """
+    Genera la carpeta plana unificada para Gemini Notebook.
+    Usa el manifiesto si se provee, o escanea el disco si no.
+    """
+    gemini_dir = course_dir / DIR_GEMINI_NOTEBOOK
+    gemini_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+
+    if manifest is not None:
+        is_legacy = any("local_path" not in item or "unit" not in item or "week" not in item for item in manifest)
+        if is_legacy:
+            manifest = None
+
+    if manifest is not None:
+        week_counters = {}
+        idx_info = 1
+        for item in manifest:
+            local_path = item["local_path"]
+            if isinstance(local_path, str):
+                local_path = Path(local_path)
+
+            if not local_path.exists() or local_path.stat().st_size == 0:
+                continue
+            
+            # Solo copiamos archivos soportados (PDF, PPTX, etc) o sin extensión válida
+            if local_path.suffix.lower() not in SUPPORTED_EXTENSIONS and local_path.suffix:
+                continue
+
+            orig_name = item.get("original_name", local_path.name)
+            is_info = item.get("is_info_general", False)
+
+            if is_info:
+                new_name = f"u0_s00_{idx_info:02d}_{orig_name}"
+                idx_info += 1
+            else:
+                u_num = item.get("unit", 0)
+                w_num = item.get("week", 0)
+                key = (u_num, w_num)
+                week_counters[key] = week_counters.get(key, 0) + 1
+                idx = week_counters[key]
+                new_name = f"u{u_num}_s{w_num:02d}_{idx:02d}_{orig_name}"
+
+            shutil.copy2(local_path, gemini_dir / new_name)
+            count += 1
+        return count
+
+    # Escaneo en disco
+    info_dir = course_dir / DIR_INFO_GENERAL
+    if info_dir.exists():
+        idx = 1
+        for file in sorted(info_dir.rglob("*")):
+            if file.is_file() and (file.suffix.lower() in SUPPORTED_EXTENSIONS or not file.suffix):
+                new_name = f"u0_s00_{idx:02d}_{file.name}"
+                shutil.copy2(file, gemini_dir / new_name)
+                idx += 1
+                count += 1
+
+    mat_dir = course_dir / DIR_MATERIALES
+    if mat_dir.exists():
+        week_counters = {}
+        # Ordenamos para asegurar que el correlativo se asigne de forma determinista
+        for file in sorted(mat_dir.rglob("*")):
+            if file.is_file() and (file.suffix.lower() in SUPPORTED_EXTENSIONS or not file.suffix):
+                rel_parts = file.relative_to(mat_dir).parts
+                path_str = " ".join(rel_parts)
+                u_num = parse_unit_number(path_str) or 0
+                w_num = parse_week_number(path_str) or 0
+                
+                key = (u_num, w_num)
+                week_counters[key] = week_counters.get(key, 0) + 1
+                idx = week_counters[key]
+                
+                new_name = f"u{u_num}_s{w_num:02d}_{idx:02d}_{file.name}"
+                shutil.copy2(file, gemini_dir / new_name)
+                count += 1
+
+    return count
 
 
 def sanitize_name(name: str) -> str:
@@ -188,7 +290,8 @@ class CourseNotebookOrganizer:
             "dir": str(course_dir),
             "evaluations": evaluations,
             "announcements_count": len(announcements),
-            "files_count": len(downloaded_files)
+            "files_count": len(downloaded_files),
+            "downloaded_files": downloaded_files
         }
 
     def _save_evaluations(self, dest_dir: Path, course_name: str, evaluations: list[dict]):
@@ -307,9 +410,15 @@ class CourseNotebookOrganizer:
                         self._processed_course_files.add(dest_file_key)
                         if progress_callback:
                             progress_callback("log", f"⚡ [dim cyan]{display_path}[/dim cyan] ➔ [dim]{file_name}[/dim] [dim green](ya descargado)[/dim green]")
+                        u_num = parse_unit_number(f"{current_relative_path} {file_name}") or 0
+                        w_num = parse_week_number(f"{current_relative_path} {file_name}") or 0
                         downloaded.append({
                             "title": title,
                             "file_name": file_name,
+                            "local_path": dest_file,
+                            "original_name": file_name,
+                            "unit": u_num,
+                            "week": w_num,
                             "path": str(dest_file.relative_to(OUTPUT_DIR)),
                             "is_info_general": (dest_dir == info_dir)
                         })
@@ -325,9 +434,15 @@ class CourseNotebookOrganizer:
                             self._processed_course_files.add(dest_file_key)
                             if progress_callback:
                                 progress_callback("log", f"💾 [dim cyan]{display_path}[/dim cyan] ➔ [bold white]{file_name}[/bold white]")
+                            u_num = parse_unit_number(f"{current_relative_path} {file_name}") or 0
+                            w_num = parse_week_number(f"{current_relative_path} {file_name}") or 0
                             downloaded.append({
                                 "title": title,
                                 "file_name": file_name,
+                                "local_path": dest_file,
+                                "original_name": file_name,
+                                "unit": u_num,
+                                "week": w_num,
                                 "path": str(dest_file.relative_to(OUTPUT_DIR)),
                                 "is_info_general": (dest_dir == info_dir)
                             })
@@ -374,9 +489,15 @@ class CourseNotebookOrganizer:
                         self._processed_course_files.add(dest_file_key)
                         if progress_callback:
                             progress_callback("log", f"⚡ [dim cyan]{display_path}[/dim cyan] ➔ [dim]{existing_name}[/dim] [dim green](ya descargado)[/dim green]")
+                        u_num = parse_unit_number(f"{current_relative_path} {existing_name}") or 0
+                        w_num = parse_week_number(f"{current_relative_path} {existing_name}") or 0
                         downloaded.append({
                             "title": emb_text if emb_text not in ["recurso", "lectura"] else existing_name,
                             "file_name": existing_name,
+                            "local_path": dest_dir / existing_name,
+                            "original_name": existing_name,
+                            "unit": u_num,
+                            "week": w_num,
                             "path": str((dest_dir / existing_name).relative_to(OUTPUT_DIR)),
                             "is_info_general": (dest_dir == info_dir)
                         })
@@ -398,9 +519,15 @@ class CourseNotebookOrganizer:
 
                     if progress_callback:
                         progress_callback("log", f"💾 [dim cyan]{display_path}[/dim cyan] ➔ [bold white]{saved_name}[/bold white]")
+                    u_num = parse_unit_number(f"{current_relative_path} {saved_name}") or 0
+                    w_num = parse_week_number(f"{current_relative_path} {saved_name}") or 0
                     downloaded.append({
                         "title": emb_text if emb_text not in ["recurso", "lectura"] else saved_name,
                         "file_name": saved_name,
+                        "local_path": dest_dir / saved_name,
+                        "original_name": saved_name,
+                        "unit": u_num,
+                        "week": w_num,
                         "path": str((dest_dir / saved_name).relative_to(OUTPUT_DIR)),
                         "is_info_general": (dest_dir == info_dir)
                     })
@@ -464,9 +591,15 @@ class CourseNotebookOrganizer:
                     try:
                         with open(doc_path, "w", encoding="utf-8") as f:
                             f.write(content_to_write)
+                        u_num = parse_unit_number(f"{current_relative_path} {doc_name}") or 0
+                        w_num = parse_week_number(f"{current_relative_path} {doc_name}") or 0
                         downloaded.append({
                             "title": title,
                             "file_name": doc_name,
+                            "local_path": doc_path,
+                            "original_name": doc_name,
+                            "unit": u_num,
+                            "week": w_num,
                             "path": str(doc_path.relative_to(OUTPUT_DIR)),
                             "is_info_general": (dest_dir == info_dir)
                         })

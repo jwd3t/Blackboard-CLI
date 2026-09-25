@@ -9,11 +9,11 @@ Herramienta de consola moderna y profesional para **Blackboard Ultra (UPC)**. Si
 No necesitas configurar entornos manualmente. El programa incluye gestores automáticos para Windows y macOS/Linux.
 
 1. **Descarga y descomprime:**
-   - Descarga el archivo `Blackboard-CLI.zip` desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
+   - Descarga el archivo `Blackboard-CLI-vX.X.X.zip` desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
 2. **Ejecutar:**
-   - **En Windows:** Haz doble clic en **`BlackboardCLI-v2.1.1-Windows.bat`**.
-   - **En Mac:** Haz doble clic en **`BlackboardCLI-v2.1.1-macOS.command`** (o en la terminal: `./BlackboardCLI-v2.1.1-macOS.command`).
-   - **En Linux:** Abre la terminal en la carpeta y ejecuta **`./BlackboardCLI-v2.1.1-Linux.sh`**.
+   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v2.2.0-Windows.bat`).
+   - **En Mac:** Haz doble clic en **`BlackboardCLI-v*.command`** (o en la terminal: `./BlackboardCLI-v*.command`).
+   - **En Linux:** Abre la terminal en la carpeta y ejecuta **`./BlackboardCLI-v*.sh`**.
    - *Nota de la primera vez:* En su primer arranque, el programa creará automáticamente un entorno virtual aislado (`.venv`) e instalará las librerías necesarias. **No dejará ningún residuo en tu sistema.**
 3. **Iniciar Sesión:**
    - En el menú principal, selecciona la opción `[5] login`.
@@ -35,6 +35,7 @@ Al iniciar la aplicación, verás la consola interactiva con las siguientes opci
 | `[5]` | `login` | **Iniciar Sesión:** Abre el navegador para autenticarte vía Microsoft 365 / SSO. |
 | `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies locales de tu PC. |
 | `[7]` | `package`| **Empaquetar:** Genera un archivo ZIP limpio y seguro para compartir con tus compañeros. |
+| `[8]` | `notebook`| **Exportar a Gemini Notebook:** Genera una carpeta plana (`gemini_notebook/`) optimizada para NotebookLM. |
 | `[0]` | `exit` | Cierra la aplicación. |
 
 > 💡 **Tip de Navegación:** Dentro de los menús de sincronización puedes escribir **`v`** en cualquier momento para volver a la pantalla anterior sin cerrar el programa.
@@ -56,8 +57,9 @@ cuadernos/
     ├── 02_MATERIALES_Y_CLASES/   <-- 📚 Contenido organizado por Semanas o Unidades
     │   ├── Semana 01/
     │   └── Semana 02/
-    └── 03_ANUNCIOS/
-        └── historial_anuncios.md <-- 📢 Comunicados oficiales del profesor
+    ├── 03_ANUNCIOS/
+    │   └── historial_anuncios.md <-- 📢 Comunicados oficiales del profesor
+    └── gemini_notebook/          <-- 🤖 (Opcional) Carpeta plana generada con el comando `notebook` lista para arrastrar a NotebookLM
 ```
 
 ---

@@ -7,6 +7,11 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.0] - 2026-09-25
+
+### ✨ Añadido
+- **Exportación unificada para Gemini Notebook / NotebookLM:** Nuevo comando `notebook` que genera una carpeta plana (`gemini_notebook/`) con todos los archivos de estudio ordenados cronológicamente (`uX_sXX_YY_archivo.ext`) listos para ser arrastrados a Gemini.
+
 ## [2.1.1] - 2026-09-24
 
 ### ✨ Añadido

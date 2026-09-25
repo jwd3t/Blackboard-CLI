@@ -48,7 +48,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 from rich import box
 from rich.progress import (
     Progress,
@@ -64,7 +64,7 @@ console = Console(force_terminal=True, color_system="truecolor")
 from config import BASE_URL, OUTPUT_DIR, VERSION
 from auth import verify_session, interactive_login, logout
 from ultra_client import UltraClient
-from organizer import CourseNotebookOrganizer, format_date
+from organizer import CourseNotebookOrganizer, format_date, generate_gemini_notebook
 try:
     import package
     HAS_PACKAGE = True
@@ -402,6 +402,10 @@ def _run_sync_all(organizer, courses):
     console.print(f"\n  📁 Cuadernos en: [bold bright_cyan]{OUTPUT_DIR}[/bold bright_cyan]")
     console.print("  💡 Contexto IA:  [bold bright_cyan]cuadernos/RESUMEN_SEMESTRE_IA.md[/bold bright_cyan]")
 
+    if Confirm.ask("\n[bold cyan]✨ ¿Deseas generar la carpeta unificada para Gemini Notebook / NotebookLM para los cursos sincronizados?[/bold cyan]", default=True):
+        for c in summary["courses"]:
+            _export_course_to_gemini(Path(c["dir"]), c.get("downloaded_files"))
+
 
 def _run_sync_single_course(organizer, selected_course, target_section=None):
     """Ejecuta la sincronización de un curso individual o una unidad/semana específica con barra de progreso."""
@@ -433,6 +437,51 @@ def _run_sync_single_course(organizer, selected_course, target_section=None):
     console.print(f"\n[bold green]✔ ¡Sincronización de {c_name} finalizada con éxito![/bold green]")
     console.print(f"📁 Cuaderno actualizado en: [bold cyan]{c_info['dir']}[/bold cyan]")
     console.print(f"📊 Materiales procesados: [bold white]{c_info['files_count']}[/bold white] | Evaluaciones: [cyan]{len(c_info['evaluations'])}[/cyan] | Anuncios: [yellow]{c_info['announcements_count']}[/yellow]")
+
+    if Confirm.ask("\n[bold cyan]✨ ¿Deseas generar la carpeta unificada para Gemini Notebook / NotebookLM?[/bold cyan]", default=True):
+        _export_course_to_gemini(Path(c_info['dir']), c_info.get("downloaded_files"))
+
+
+def _export_course_to_gemini(course_dir: Path, manifest: list[dict] | None = None):
+    with console.status(f"[bold cyan]Generando carpeta unificada para Gemini Notebook en {course_dir.name}...[/bold cyan]"):
+        count = generate_gemini_notebook(course_dir, manifest)
+    console.print(f"[bold green]✔ Carpeta gemini_notebook/ lista con {count} archivos unificados.[/bold green]")
+
+
+def cmd_notebook():
+    """Genera la carpeta unificada para Gemini Notebook (Exportación sin red)."""
+    dirs = [d for d in OUTPUT_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
+    if not dirs:
+        console.print("[yellow]No se encontraron cursos descargados en la carpeta cuadernos.[/yellow]")
+        return
+        
+    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
+    table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
+    table.add_column("Curso Local", style="bold white")
+    table.add_row("[0]", "⚡ Exportar [bold]TODOS[/bold] los cursos locales")
+    table.add_row("[v]", "↩ Volver al menú principal")
+    table.add_row("", "")
+    
+    for i, d in enumerate(dirs, 1):
+        table.add_row(f"[{i}]", f"📂 {d.name}")
+        
+    console.print(Panel(
+        table,
+        title="[bold white] Exportar a Gemini Notebook [/bold white]",
+        border_style="grey37",
+        box=box.ROUNDED
+    ))
+    
+    valid_choices = [str(i) for i in range(len(dirs) + 1)] + ["v"]
+    choice = Prompt.ask("\n[bold bright_cyan]notebook[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=valid_choices)
+    
+    if choice == "v":
+        return
+    elif choice == "0":
+        for d in dirs:
+            _export_course_to_gemini(d)
+    else:
+        _export_course_to_gemini(dirs[int(choice) - 1])
 
 
 def cmd_sync():
@@ -579,6 +628,7 @@ def interactive_menu():
         menu_table.add_row("[5]", "🔐", "login", "Autenticar cuenta o iniciar sesión")
         menu_table.add_row("[6]", "🚪", "logout", "Cerrar sesión y borrar credenciales")
         menu_table.add_row("[7]", "📦", "package", "Generar ZIP seguro para compartir")
+        menu_table.add_row("[8]", "🤖", "notebook", "Exportar a Gemini Notebook")
         menu_table.add_row("", "", "", "")
         menu_table.add_row("[0]", "❌", "exit", "Salir")
 
@@ -611,6 +661,8 @@ def interactive_menu():
             cmd_logout()
         elif choice in ["7", "package", "empaquetar"]:
             cmd_package()
+        elif choice in ["8", "notebook", "export"]:
+            cmd_notebook()
         elif choice in ["0", "exit", "quit", "q"]:
             console.print()
             console.print("[dim grey50]  Cerrando Blackboard CLI...[/dim grey50]")
@@ -641,9 +693,11 @@ def main():
                 cmd_logout()
             elif arg in ["package", "empaquetar"]:
                 cmd_package()
+            elif arg in ["notebook", "export"]:
+                cmd_notebook()
             else:
                 console.print(f"[red]Comando desconocido: {arg}[/red]")
-                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, package")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, package, notebook")
         else:
             interactive_menu()
     except KeyboardInterrupt:
