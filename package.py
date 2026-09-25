@@ -25,7 +25,6 @@ FILES_TO_INCLUDE = [
     "auth.py",
     "config.py",
     "requirements.txt",
-    "package.py",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",

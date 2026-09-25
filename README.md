@@ -34,8 +34,7 @@ Al iniciar la aplicación, verás la consola interactiva con las siguientes opci
 | `[4]` | `status` | **Diagnóstico:** Revisa el estado de la conexión con el servidor Ultra y tu perfil de estudiante. |
 | `[5]` | `login` | **Iniciar Sesión:** Abre el navegador para autenticarte vía Microsoft 365 / SSO. |
 | `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies locales de tu PC. |
-| `[7]` | `package`| **Empaquetar:** Genera un archivo ZIP limpio y seguro para compartir con tus compañeros. |
-| `[8]` | `notebook`| **Exportar a Gemini Notebook:** Genera una carpeta plana (`gemini_notebook/`) optimizada para NotebookLM. |
+| `[7]` | `notebook`| **Exportar a Gemini Notebook:** Genera una carpeta plana (`gemini_notebook/`) optimizada para NotebookLM. |
 | `[0]` | `exit` | Cierra la aplicación. |
 
 > 💡 **Tip de Navegación:** Dentro de los menús de sincronización puedes escribir **`v`** en cualquier momento para volver a la pantalla anterior sin cerrar el programa.

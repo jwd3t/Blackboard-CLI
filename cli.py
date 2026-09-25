@@ -65,11 +65,6 @@ from config import BASE_URL, OUTPUT_DIR, VERSION
 from auth import verify_session, interactive_login, logout
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer, format_date, generate_gemini_notebook
-try:
-    import package
-    HAS_PACKAGE = True
-except ImportError:
-    HAS_PACKAGE = False
 
 TEXT_FULL = r"""[bold bright_cyan]
  ██████╗ ██╗      █████╗  ██████╗██╗  ██╗██████╗  ██████╗  █████╗ ██████╗ ██████╗
@@ -583,17 +578,6 @@ def cmd_sync():
         _run_sync_single_course(organizer, selected_course, target_section=chosen_section)
 
 
-def cmd_package():
-    """Empaqueta una versión limpia y segura para compartir."""
-    print_header(verify_session())
-    if not HAS_PACKAGE:
-        console.print("[bold yellow]El script de empaquetado (package.py) no está presente.[/bold yellow]")
-        console.print("Ya estás usando una versión extraída o portable.")
-        return
-    console.print("[bold cyan]Generando paquete portable seguro (ZIP)...[/bold cyan]\n")
-    package.create_package()
-
-
 def cmd_logout():
     """Cierra la sesión actual y elimina credenciales locales."""
     print_header()
@@ -627,8 +611,7 @@ def interactive_menu():
         menu_table.add_row("[4]", "🔍", "status", "Diagnóstico de conexión y sesión")
         menu_table.add_row("[5]", "🔐", "login", "Autenticar cuenta o iniciar sesión")
         menu_table.add_row("[6]", "🚪", "logout", "Cerrar sesión y borrar credenciales")
-        menu_table.add_row("[7]", "📦", "package", "Generar ZIP seguro para compartir")
-        menu_table.add_row("[8]", "🤖", "notebook", "Exportar a Gemini Notebook")
+        menu_table.add_row("[7]", "🤖", "notebook", "Exportar a Gemini Notebook")
         menu_table.add_row("", "", "", "")
         menu_table.add_row("[0]", "❌", "exit", "Salir")
 
@@ -659,9 +642,7 @@ def interactive_menu():
             cmd_login()
         elif choice in ["6", "logout"]:
             cmd_logout()
-        elif choice in ["7", "package", "empaquetar"]:
-            cmd_package()
-        elif choice in ["8", "notebook", "export"]:
+        elif choice in ["7", "notebook", "export"]:
             cmd_notebook()
         elif choice in ["0", "exit", "quit", "q"]:
             console.print()
@@ -691,13 +672,11 @@ def main():
                 cmd_sync()
             elif arg == "logout":
                 cmd_logout()
-            elif arg in ["package", "empaquetar"]:
-                cmd_package()
             elif arg in ["notebook", "export"]:
                 cmd_notebook()
             else:
                 console.print(f"[red]Comando desconocido: {arg}[/red]")
-                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, package, notebook")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook")
         else:
             interactive_menu()
     except KeyboardInterrupt:
