@@ -9,7 +9,7 @@ Herramienta de consola moderna y profesional para **Blackboard Ultra (UPC)**. Si
 No necesitas configurar entornos manualmente. El programa incluye gestores automáticos para Windows y macOS/Linux.
 
 1. **Descarga y descomprime:**
-   - Descarga el archivo `Blackboard-CLI-vX.X.X.zip` desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
+   - Descarga el archivo [Blackboard-CLI.zip](https://github.com/jwd3t/Blackboard-CLI/releases) desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
 2. **Ejecutar:**
    - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v2.2.0-Windows.bat`).
    - **En Mac:** Haz doble clic en **`BlackboardCLI-v*.command`** (o en la terminal: `./BlackboardCLI-v*.command`).
