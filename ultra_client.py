@@ -331,11 +331,49 @@ class UltraClient:
             seen_canonical = set()
             if raw_body:
                 soup = BeautifulSoup(raw_body, "html.parser")
+
+                # 1. Elementos con atributos de Blackboard Ally (data-ally-file-preview-url, etc.)
+                ally_attrs = [
+                    "data-ally-file-preview-url",
+                    "data-ally-download-url",
+                    "data-ally-preview-url",
+                    "data-ally-file-url",
+                    "data-ally-rich-content-url"
+                ]
+                for tag in soup.find_all(lambda t: any(attr in getattr(t, "attrs", {}) for attr in ally_attrs)):
+                    for attr in ally_attrs:
+                        val = tag.get(attr)
+                        if val and isinstance(val, str):
+                            raw_url = html.unescape(val.strip())
+                            if not raw_url:
+                                continue
+                            canon = raw_url.split("?")[0].rstrip("/")
+                            if canon in seen_canonical:
+                                continue
+                            seen_canonical.add(canon)
+
+                            # Intentar obtener el nombre del archivo desde metadatos de Ally o texto
+                            text = (
+                                tag.get("data-ally-filename", "").strip() or
+                                tag.get("data-ally-file-name", "").strip() or
+                                tag.get("data-filename", "").strip() or
+                                tag.get("data-name", "").strip() or
+                                tag.get("title", "").strip() or
+                                tag.get("aria-label", "").strip() or
+                                tag.get_text().strip() or
+                                title
+                            )
+                            embedded_files.append({
+                                "url": raw_url,
+                                "text": text or title or "documento"
+                            })
+
+                # 2. Enlaces tradicionales <a> (bbcswebdav, xid-, o data-ally)
                 for a in soup.find_all("a", href=True):
                     raw_href = html.unescape(a["href"].strip())
                     if not raw_href:
                         continue
-                    if "bbcswebdav" in raw_href or "/xid-" in raw_href:
+                    if "bbcswebdav" in raw_href or "/xid-" in raw_href or "ally" in raw_href.lower():
                         canon = raw_href.split("?")[0].rstrip("/")
                         if canon in seen_canonical:
                             continue
@@ -343,6 +381,8 @@ class UltraClient:
 
                         # Buscar el mejor nombre o texto descriptivo disponible
                         text = (
+                            a.get("data-ally-filename", "").strip() or
+                            a.get("data-ally-file-name", "").strip() or
                             a.get_text().strip() or
                             a.get("title", "").strip() or
                             a.get("aria-label", "").strip() or
@@ -353,10 +393,21 @@ class UltraClient:
                             text = a.find("img").get("alt", "").strip()
                         embedded_files.append({
                             "url": raw_href,
-                            "text": text or "recurso"
+                            "text": text or title or "recurso"
                         })
 
-                # Extraer cualquier otra URL de bbcswebdav encontrada en el HTML (incluyendo fuentes de bloques Ultra)
+                # 3. Regex para data-ally-file-preview-url (por si el HTML está malformado o en atributos JS)
+                for match_url in re.findall(r'data-ally-(?:file-preview|download|preview|file|rich-content)-url=["\']([^"\']+)["\']', raw_body, re.IGNORECASE):
+                    raw_match = html.unescape(match_url.rstrip(".,;)\"'"))
+                    canon = raw_match.split("?")[0].rstrip("/")
+                    if canon not in seen_canonical:
+                        seen_canonical.add(canon)
+                        embedded_files.append({
+                            "url": raw_match,
+                            "text": title or "documento"
+                        })
+
+                # 4. Regex para bbcswebdav encontrada en el HTML
                 for match_url in re.findall(r'https?://[^\s"\'<>)]+bbcswebdav[^\s"\'<>)]+|/bbcswebdav/[^\s"\'<>)]+', raw_body):
                     raw_match = html.unescape(match_url.rstrip(".,;)\"'"))
                     canon = raw_match.split("?")[0].rstrip("/")
@@ -473,6 +524,12 @@ class UltraClient:
                         "text/csv": ".csv",
                     }
                     ext = mimes.get(clean_ct) or mimetypes.guess_extension(clean_ct) or ""
+                    if not ext:
+                        # Extraer extensión de la URL si existe
+                        url_path = urllib.parse.urlparse(canon_url).path
+                        cand_ext = Path(url_path).suffix.lower()
+                        if cand_ext in SUPPORTED_EXTENSIONS:
+                            ext = cand_ext
 
                     if Path(fallback_name).suffix:
                         real_name = fallback_name
@@ -487,8 +544,29 @@ class UltraClient:
                 # Omitir imágenes y videos por extensión
                 ignored_exts = {".mp4", ".mov", ".avi", ".mkv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico"}
                 ext_check = Path(real_name).suffix.lower()
-                if ext_check in ignored_exts or not ext_check:
+                if ext_check in ignored_exts:
                     return None
+
+                # Leer el primer bloque de bytes para inspección o si falta extensión
+                first_chunk = b""
+                stream_iter = resp.iter_bytes(chunk_size=8192)
+                try:
+                    first_chunk = next(stream_iter, b"")
+                except StopIteration:
+                    pass
+
+                if not first_chunk:
+                    return None
+
+                if not ext_check:
+                    if first_chunk.startswith(b"%PDF"):
+                        real_name += ".pdf"
+                    elif first_chunk.startswith(b"PK\x03\x04"):
+                        real_name += ".zip"
+                    elif first_chunk.startswith(b"\xd0\xcf\x11\xe0"):
+                        real_name += ".doc"
+                    else:
+                        return None
 
                 final_path = dest_dir / real_name
                 # Si ya existe con tamaño mayor a 0, registrar en caché y no re-descargar
@@ -498,7 +576,8 @@ class UltraClient:
                     return real_name
 
                 with open(final_path, "wb") as f:
-                    for chunk in resp.iter_bytes(chunk_size=8192):
+                    f.write(first_chunk)
+                    for chunk in stream_iter:
                         f.write(chunk)
 
                 self.downloads_cache[canon_url] = real_name

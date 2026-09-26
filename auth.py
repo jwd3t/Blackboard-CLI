@@ -113,10 +113,12 @@ def interactive_login(timeout_seconds: int = 180) -> bool:
                 break
 
             # 2. Revisar las URLs de todas las pestañas abiertas
+            import urllib.parse
+            base_domain = urllib.parse.urlparse(BASE_URL).netloc.lower()
             all_urls = [p.url for p in context.pages]
             for u in all_urls:
                 u_lower = u.lower()
-                if "aulavirtual.upc.edu.pe" in u_lower:
+                if (base_domain and base_domain in u_lower) or "blackboard" in u_lower or "aulavirtual" in u_lower:
                     if any(path in u_lower for path in ["/ultra", "/webapps/portal", "/webapps/blackboard", "tab_tab_group_id"]):
                         if "login" not in u_lower and "microsoft" not in u_lower:
                             logged_in = True

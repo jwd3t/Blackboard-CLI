@@ -451,12 +451,23 @@ class CourseNotebookOrganizer:
             embedded_files = list(node.get("embedded_files", []))
             seen_canonical = {html.unescape(emb.get("url", "")).split("?")[0].rstrip("/") for emb in embedded_files if emb.get("url")}
 
-            # Asegurar que cualquier enlace bbcswebdav presente en description_md o raw_body se incluya sin duplicados
+            # Asegurar que cualquier enlace bbcswebdav o data-ally presente en description_md o raw_body se incluya sin duplicados
             desc_md = node.get("description_md", "").strip()
             raw_body = node.get("raw_body", "")
             for text_src in (desc_md, raw_body):
                 if not text_src:
                     continue
+                # 1. Regex para enlaces con atributos de Blackboard Ally (data-ally-file-preview-url, etc.)
+                for match_url in re.findall(r'data-ally-(?:file-preview|download|preview|file|rich-content)-url=["\']([^"\']+)["\']', text_src, re.IGNORECASE):
+                    raw_match = html.unescape(match_url.rstrip(".,;)\"'"))
+                    canon = raw_match.split("?")[0].rstrip("/")
+                    if canon not in seen_canonical:
+                        seen_canonical.add(canon)
+                        embedded_files.append({
+                            "url": raw_match,
+                            "text": title or "documento"
+                        })
+                # 2. Regex para enlaces bbcswebdav
                 for match_url in re.findall(r'https?://[^\s"\'<>)]+bbcswebdav[^\s"\'<>)]+|/bbcswebdav/[^\s"\'<>)]+', text_src):
                     raw_match = html.unescape(match_url.rstrip(".,;)\"'"))
                     canon = raw_match.split("?")[0].rstrip("/")

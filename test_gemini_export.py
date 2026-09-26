@@ -103,7 +103,63 @@ def test_manifest_copy():
         assert "u1_s01_01_diapo.pdf" in files
         print("✅ Manifest copy tests passed")
 
+
+def test_ally_preview_url():
+    from ultra_client import UltraClient
+    from bs4 import BeautifulSoup
+    import html
+    import re
+
+    sample_html = """
+    <div class="content-item">
+        <p>Lectura de clase:</p>
+        <div data-ally-file-preview-url="/bbcswebdav/xid-987654_1" data-ally-filename="Clase_03_Arquitectura.pdf" class="inline-file">
+            <span>Ver archivo adjunto</span>
+        </div>
+        <p>Otra lectura adicional:</p>
+        <button type="button" data-ally-download-url="https://aulavirtual.upc.edu.pe/bbcswebdav/xid-112233_1" title="Guia_Estudio.docx">
+            Descargar
+        </button>
+    </div>
+    """
+
+    # Simular la lógica de extracción de UltraClient
+    embedded_files = []
+    seen_canonical = set()
+    soup = BeautifulSoup(sample_html, "html.parser")
+    ally_attrs = [
+        "data-ally-file-preview-url",
+        "data-ally-download-url",
+        "data-ally-preview-url",
+        "data-ally-file-url",
+        "data-ally-rich-content-url"
+    ]
+    for tag in soup.find_all(lambda t: any(attr in getattr(t, "attrs", {}) for attr in ally_attrs)):
+        for attr in ally_attrs:
+            val = tag.get(attr)
+            if val and isinstance(val, str):
+                raw_url = html.unescape(val.strip())
+                canon = raw_url.split("?")[0].rstrip("/")
+                if canon in seen_canonical:
+                    continue
+                seen_canonical.add(canon)
+                text = (
+                    tag.get("data-ally-filename", "").strip() or
+                    tag.get("title", "").strip() or
+                    tag.get_text().strip()
+                )
+                embedded_files.append({"url": raw_url, "text": text})
+
+    assert len(embedded_files) == 2
+    assert embedded_files[0]["url"] == "/bbcswebdav/xid-987654_1"
+    assert embedded_files[0]["text"] == "Clase_03_Arquitectura.pdf"
+    assert embedded_files[1]["url"] == "https://aulavirtual.upc.edu.pe/bbcswebdav/xid-112233_1"
+    assert embedded_files[1]["text"] == "Guia_Estudio.docx"
+    print("✅ Blackboard Ally preview url extraction tests passed")
+
+
 if __name__ == "__main__":
     test_regex()
     test_unified_copy()
     test_manifest_copy()
+    test_ally_preview_url()
