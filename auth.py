@@ -225,28 +225,34 @@ def interactive_login(
         print("[*] Esperando a que completes el inicio de sesión en el navegador...")
         print("[*] (Si ya ves tu aula virtual en la pantalla, puedes presionar ENTER en esta consola para continuar)\n")
 
-        import threading
-
         user_pressed_enter = False
-
-        def wait_for_enter():
-            nonlocal user_pressed_enter
-            try:
-                input()
-                user_pressed_enter = True
-            except Exception:
-                pass
-
-        enter_thread = threading.Thread(target=wait_for_enter, daemon=True)
-        enter_thread.start()
-
         start_time = time.time()
         logged_in = False
         user_info = None
 
         try:
             while time.time() - start_time < timeout_seconds:
-                # 1. Si el usuario presionó ENTER manualmente
+                # 1. Comprobar si el usuario presionó ENTER en consola de forma no bloqueante
+                if sys.platform == "win32":
+                    try:
+                        import msvcrt
+                        while msvcrt.kbhit():
+                            ch = msvcrt.getch()
+                            if ch in (b"\r", b"\n"):
+                                user_pressed_enter = True
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        import select
+                        if hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+                            rlist, _, _ = select.select([sys.stdin], [], [], 0)
+                            if rlist:
+                                sys.stdin.readline()
+                                user_pressed_enter = True
+                    except Exception:
+                        pass
+
                 if user_pressed_enter:
                     print("\n[i] Capturando sesión a solicitud del usuario...")
                     raw_cookies = context.cookies()

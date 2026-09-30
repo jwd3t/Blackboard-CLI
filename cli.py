@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import sys
 import subprocess
+import time
 from pathlib import Path
 
 # Asegurar codificación UTF-8 en consola de Windows
@@ -198,6 +199,48 @@ def print_header(user: dict | None = None):
     console.print()
 
 
+def timed_pause(seconds: int = 3) -> None:
+    """
+    Pausa con temporizador visual simple de cuenta regresiva (3s por defecto).
+    Avanza automáticamente al terminar el tiempo o inmediatamente si el usuario presiona ENTER o cualquier tecla.
+    """
+    console.print()
+    is_tty = hasattr(sys.stdin, "isatty") and sys.stdin.isatty()
+    try:
+        if not is_tty:
+            time.sleep(min(seconds, 1))
+            return
+
+        for remaining in range(seconds, 0, -1):
+            text = f"\r[dim grey50]  Continuando en [bold cyan]{remaining}s[/bold cyan]... (o presiona ENTER)[/dim grey50]   "
+            console.print(text, end="")
+            start_chunk = time.time()
+            while time.time() - start_chunk < 1.0:
+                if sys.platform == "win32":
+                    import msvcrt
+                    if msvcrt.kbhit():
+                        ch = msvcrt.getch()
+                        if ch in (b"\x00", b"\xe0") and msvcrt.kbhit():
+                            msvcrt.getch()
+                        while msvcrt.kbhit():
+                            msvcrt.getch()
+                        console.print("\r" + " " * 65 + "\r", end="")
+                        return
+                else:
+                    import select
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.05)
+                    if rlist:
+                        sys.stdin.readline()
+                        console.print("\r" + " " * 65 + "\r", end="")
+                        return
+                time.sleep(0.05)
+
+        console.print("\r" + " " * 65 + "\r", end="")
+    except KeyboardInterrupt:
+        console.print("\r" + " " * 65 + "\r", end="")
+        raise
+
+
 def check_auth_or_prompt():
     """Verifica si hay una sesión activa con fallback interactivo."""
     user = verify_session()
@@ -208,9 +251,8 @@ def check_auth_or_prompt():
     console.print(f"[yellow]⚠️  No se detectó una sesión activa en Blackboard Ultra ({short_name}).[/yellow]")
     opt = Prompt.ask(f"   ¿Deseas iniciar sesión en {short_name} ahora mismo?", choices=["s", "n"], default="s")
     if opt.lower() == "s":
-        success = interactive_login()
-        if success:
-            return verify_session()
+        cmd_login()
+        return verify_session()
     return None
 
 
@@ -237,6 +279,8 @@ def cmd_login():
             console.print("[dim]   (Prueba volver a iniciar sesión asegurándote de llegar hasta la lista de tus cursos).[/dim]")
     else:
         console.print("[bold red]✖ No se pudo completar el inicio de sesión.[/bold red]")
+
+    timed_pause(3)
 
 
 def cmd_status():
@@ -700,7 +744,8 @@ def cmd_institution():
     if not new_user:
         start_login = Confirm.ask("\n¿Deseas iniciar sesión ahora en esta institución?", default=True)
         if start_login:
-            interactive_login()
+            cmd_login()
+            return
 
 
 def interactive_menu():
@@ -758,12 +803,14 @@ def interactive_menu():
             cmd_status()
         elif choice in ["5", "login"]:
             cmd_login()
+            continue
         elif choice in ["6", "logout"]:
             cmd_logout()
         elif choice in ["7", "notebook", "export"]:
             cmd_notebook()
         elif choice in ["8", "institucion", "universidad", "university", "inst"]:
             cmd_institution()
+            continue
         elif choice in ["0", "exit", "quit", "q"]:
             console.print()
             console.print("[dim grey50]  Cerrando Blackboard CLI...[/dim grey50]")
