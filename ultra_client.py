@@ -15,7 +15,13 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup
 
-from config import BASE_URL, DOWNLOADS_CACHE_FILE, SUPPORTED_EXTENSIONS
+from config import (
+    BASE_URL,
+    DOWNLOADS_CACHE_FILE,
+    SUPPORTED_EXTENSIONS,
+    get_base_url,
+    get_downloads_cache_file,
+)
 from auth import get_stored_cookies
 
 
@@ -39,10 +45,17 @@ def get_filename_from_cd(cd_header: str) -> str | None:
 
 
 class UltraClient:
-    def __init__(self, cookies: dict[str, str] | None = None):
+    def __init__(
+        self,
+        cookies: dict[str, str] | None = None,
+        base_url: str | None = None,
+        cache_file: Path | None = None,
+    ):
         if cookies is None:
             cookies = get_stored_cookies() or {}
         self.cookies = cookies
+        self.base_url = base_url or get_base_url()
+        self.cache_file = cache_file or get_downloads_cache_file()
         xsrf = self.cookies.get("XSRF-TOKEN", "")
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -51,7 +64,7 @@ class UltraClient:
             "X-XSRF-TOKEN": xsrf,
         }
         self.client = httpx.Client(
-            base_url=BASE_URL,
+            base_url=self.base_url,
             cookies=self.cookies,
             headers=self.headers,
             timeout=30.0,
@@ -65,9 +78,9 @@ class UltraClient:
 
     def _load_cache(self):
         """Carga la correspondencia URL -> archivo descargado desde la sesión local."""
-        if DOWNLOADS_CACHE_FILE.exists():
+        if self.cache_file and self.cache_file.exists():
             try:
-                with open(DOWNLOADS_CACHE_FILE, "r", encoding="utf-8") as f:
+                with open(self.cache_file, "r", encoding="utf-8") as f:
                     self.downloads_cache = json.load(f)
             except Exception:
                 self.downloads_cache = {}
@@ -76,9 +89,11 @@ class UltraClient:
 
     def _save_cache(self):
         """Guarda la caché persistente de archivos descargados."""
+        if not self.cache_file:
+            return
         try:
-            DOWNLOADS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(DOWNLOADS_CACHE_FILE, "w", encoding="utf-8") as f:
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(self.downloads_cache, f, ensure_ascii=False, indent=2)
         except Exception:
             pass

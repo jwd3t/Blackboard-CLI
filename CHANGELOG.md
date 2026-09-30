@@ -7,6 +7,25 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [3.0.0] - 2026-09-29
+
+### ✨ Añadido
+- **Soporte Multi-Institución y Genérico:**
+  - Soporte nativo para múltiples universidades: **UPC** (`aulavirtual.upc.edu.pe`), **UCV - Universidad César Vallejo** (`ucv.blackboard.com`) y **UPN - Universidad Privada del Norte** (`upn.blackboard.com`).
+  - Soporte genérico para **cualquier servidor Blackboard Learn / Ultra**: permite ingresar la URL de cualquier universidad y valida automáticamente la compatibilidad con los endpoints de Blackboard Learn REST API (`/learn/api/public/v1/system/version`).
+- **Aislamiento completo de sesiones por universidad:**
+  - Cookies persistentes separadas por institución (`cookies_upc.json`, `cookies_ucv.json`, etc.) y perfiles de navegador independientes (`browser_upc/`, `browser_ucv/`).
+  - Cambiar de universidad no cierra la sesión ni invalida las credenciales de las otras.
+  - Caché de descargas independiente por universidad (`downloads_cache_<inst>.json`).
+- **Selector interactivo de universidad:**
+  - Nueva opción en el menú interactivo `[8] institucion` y argumento CLI `institucion` para alternar de manera fluida entre universidades o configurar una URL personalizada.
+- **Headers y diagnóstico dinámicos:**
+  - El banner, barra de estado y tabla de diagnóstico reflejan el nombre de la institución activa, URL base y color temático.
+- **Inyección de dependencias y desacoplamiento (SOLID):**
+  - `UltraClient` y `CourseNotebookOrganizer` ahora permiten inyectar URLs base, rutas de caché y directorios de salida arbitrarios.
+- **Retrocompatibilidad transparente:**
+  - Detección automática y migración de sesiones existentes de la versión 2.x (`cookies.json` y `downloads_cache.json`).
+
 ## [2.2.0] - 2026-09-25
 
 ### ✨ Añadido

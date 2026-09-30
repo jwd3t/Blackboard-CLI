@@ -168,10 +168,11 @@ def format_display_path(dest_dir: Path, course_dir: Path | None, current_relativ
 
 
 class CourseNotebookOrganizer:
-    def __init__(self, client: UltraClient):
+    def __init__(self, client: UltraClient, output_dir: Path | None = None):
         self.client = client
+        self.output_dir = output_dir or OUTPUT_DIR
         self._processed_course_files: set[str] = set()
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def sync_all_courses(self, progress_callback=None) -> dict:
         """Sincroniza todos los cursos activos y genera sus cuadernos."""
@@ -212,7 +213,7 @@ class CourseNotebookOrganizer:
         course_name = course.get("name", "Curso")
         course_code = course.get("course_id", "")
         folder_name = sanitize_name(f"[{course_code}] {course_name}" if course_code else course_name)
-        course_dir = OUTPUT_DIR / folder_name
+        course_dir = self.output_dir / folder_name
 
         # Crear subdirectorios del cuaderno
         dir_info = course_dir / DIR_INFO_GENERAL
@@ -419,7 +420,7 @@ class CourseNotebookOrganizer:
                             "original_name": file_name,
                             "unit": u_num,
                             "week": w_num,
-                            "path": str(dest_file.relative_to(OUTPUT_DIR)),
+                            "path": str(dest_file.relative_to(self.output_dir)),
                             "is_info_general": (dest_dir == info_dir)
                         })
                         continue
@@ -443,7 +444,7 @@ class CourseNotebookOrganizer:
                                 "original_name": file_name,
                                 "unit": u_num,
                                 "week": w_num,
-                                "path": str(dest_file.relative_to(OUTPUT_DIR)),
+                                "path": str(dest_file.relative_to(self.output_dir)),
                                 "is_info_general": (dest_dir == info_dir)
                             })
 
@@ -498,7 +499,7 @@ class CourseNotebookOrganizer:
                             "original_name": existing_name,
                             "unit": u_num,
                             "week": w_num,
-                            "path": str((dest_dir / existing_name).relative_to(OUTPUT_DIR)),
+                            "path": str((dest_dir / existing_name).relative_to(self.output_dir)),
                             "is_info_general": (dest_dir == info_dir)
                         })
                     continue
@@ -528,7 +529,7 @@ class CourseNotebookOrganizer:
                         "original_name": saved_name,
                         "unit": u_num,
                         "week": w_num,
-                        "path": str((dest_dir / saved_name).relative_to(OUTPUT_DIR)),
+                        "path": str((dest_dir / saved_name).relative_to(self.output_dir)),
                         "is_info_general": (dest_dir == info_dir)
                     })
                 else:
@@ -600,7 +601,7 @@ class CourseNotebookOrganizer:
                             "original_name": doc_name,
                             "unit": u_num,
                             "week": w_num,
-                            "path": str(doc_path.relative_to(OUTPUT_DIR)),
+                            "path": str(doc_path.relative_to(self.output_dir)),
                             "is_info_general": (dest_dir == info_dir)
                         })
                     except Exception:
@@ -681,7 +682,7 @@ class CourseNotebookOrganizer:
 
     def _generate_master_summary(self, courses: list[dict], all_evaluations: list[dict]):
         """Genera el cuaderno maestro de todo el semestre para consulta de la IA."""
-        master_file = OUTPUT_DIR / "RESUMEN_SEMESTRE_IA.md"
+        master_file = self.output_dir / "RESUMEN_SEMESTRE_IA.md"
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         # Filtrar y ordenar evaluaciones globales por fecha

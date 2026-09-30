@@ -61,7 +61,17 @@ from rich.progress import (
 
 console = Console(force_terminal=True, color_system="truecolor")
 
-from config import BASE_URL, OUTPUT_DIR, VERSION
+from config import (
+    BASE_URL,
+    OUTPUT_DIR,
+    VERSION,
+    get_base_url,
+    get_active_institution,
+    set_active_institution,
+    DEFAULT_INSTITUTIONS,
+    validate_blackboard_url,
+    normalize_url,
+)
 from auth import verify_session, interactive_login, logout
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer, format_date, generate_gemini_notebook
@@ -147,12 +157,17 @@ def print_header(user: dict | None = None):
         fallback_table.add_row(TEXT_FULL)
         console.print(fallback_table, justify="center")
 
+    inst = get_active_institution()
+    short_name = inst.get("short_name", "UPC")
+    inst_color = inst.get("color", "bright_cyan")
+    base_url = get_base_url()
+
     # Tagline + version pill
     tagline = Text(justify="center")
-    tagline.append("  Aula Virtual UPC", style="dim white")
+    tagline.append(f"  Aula Virtual • {short_name}", style="dim white")
     tagline.append("  •  ", style="dim grey50")
     tagline.append("Sincronizador de Cuadernos para IA", style="dim italic grey70")
-    tagline.append(f"  v{VERSION} ", style="bold black on bright_cyan")
+    tagline.append(f"  v{VERSION} ", style=f"bold black on {inst_color}")
     console.print(tagline)
 
     # Línea separadora
@@ -167,17 +182,17 @@ def print_header(user: dict | None = None):
         status_bar.append(f"{name} ", style="bold white")
         status_bar.append(f"({student_id})", style="dim cyan")
         status_bar.append("  │  ", style="dim grey42")
-        status_bar.append("Ultra ", style="bold green")
+        status_bar.append(f"{short_name} ", style=f"bold {inst_color}")
         status_bar.append("Conectado", style="green")
         status_bar.append("  │  ", style="dim grey42")
-        status_bar.append(f"{BASE_URL.replace('https://', '')}", style="dim grey50")
+        status_bar.append(f"{base_url.replace('https://', '')}", style="dim grey50")
     else:
         status_bar.append("  ○ ", style="bold yellow")
-        status_bar.append("Sesión no iniciada", style="yellow")
+        status_bar.append(f"Sesión no iniciada ({short_name})", style="yellow")
         status_bar.append("  │  ", style="dim grey42")
         status_bar.append("Ejecuta ", style="dim")
         status_bar.append("login", style="bold cyan")
-        status_bar.append(" para conectar tu cuenta UPC", style="dim")
+        status_bar.append(f" para conectar tu cuenta de {short_name}", style="dim")
 
     console.print(status_bar)
     console.print()
@@ -188,8 +203,10 @@ def check_auth_or_prompt():
     user = verify_session()
     if user:
         return user
-    console.print("[yellow]⚠️  No se detectó una sesión activa en Blackboard Ultra.[/yellow]")
-    opt = Prompt.ask("   ¿Deseas iniciar sesión en UPC ahora mismo?", choices=["s", "n"], default="s")
+    inst = get_active_institution()
+    short_name = inst.get("short_name", "tu universidad")
+    console.print(f"[yellow]⚠️  No se detectó una sesión activa en Blackboard Ultra ({short_name}).[/yellow]")
+    opt = Prompt.ask(f"   ¿Deseas iniciar sesión en {short_name} ahora mismo?", choices=["s", "n"], default="s")
     if opt.lower() == "s":
         success = interactive_login()
         if success:
@@ -221,28 +238,38 @@ def cmd_status():
     """Diagnóstico detallado de sesión y conectividad."""
     user = verify_session()
     print_header(user)
+    inst = get_active_institution()
+    inst_color = inst.get("color", "bright_cyan")
+    base_url = get_base_url()
+
+    table = Table(box=box.ROUNDED, border_style="grey37", show_header=False, padding=(0, 2))
+    table.add_column("Propiedad", style="dim bright_cyan")
+    table.add_column("Valor", style="white")
+
     if user:
         name = f"{user.get('name', {}).get('given', '')} {user.get('name', {}).get('family', '')}".strip()
-        table = Table(box=box.ROUNDED, border_style="grey37", show_header=False, padding=(0, 2))
-        table.add_column("Propiedad", style="dim bright_cyan")
-        table.add_column("Valor", style="white")
-
         table.add_row("Estado", "[bold green]● Conectado[/bold green]")
+        table.add_row("Institución", f"[{inst_color}]{inst.get('name', 'N/A')}[/{inst_color}]")
         table.add_row("Estudiante", f"[bold white]{name}[/bold white]")
-        table.add_row("Código UPC", f"[bright_cyan]{user.get('studentId', 'N/A')}[/bright_cyan]")
+        table.add_row("Código / Usuario", f"[bright_cyan]{user.get('studentId') or user.get('userName', 'N/A')}[/bright_cyan]")
         table.add_row("ID Ultra", f"[dim]{user.get('id', 'N/A')}[/dim]")
-        table.add_row("Servidor", f"[dim]{BASE_URL}[/dim]")
+        table.add_row("Servidor", f"[dim]{base_url}[/dim]")
         table.add_row("Cuadernos", f"[dim]{OUTPUT_DIR}[/dim]")
 
         console.print(Panel(table, title="[bold white] Diagnóstico [/bold white]", title_align="left", border_style="grey37", box=box.ROUNDED))
     else:
+        table.add_row("Estado", "[bold red]✖ Sesión inactiva o expirada[/bold red]")
+        table.add_row("Institución activa", f"[{inst_color}]{inst.get('name', 'N/A')}[/{inst_color}]")
+        table.add_row("Servidor", f"[dim]{base_url}[/dim]")
+        table.add_row("Cuadernos", f"[dim]{OUTPUT_DIR}[/dim]")
+
         console.print(Panel(
-            "[bold red]✖ Sesión inactiva o expirada[/bold red]\n\n"
-            "  Ejecuta [bold cyan]login[/bold cyan] para acceder con tu correo institucional.",
+            table,
             title="[bold white] Diagnóstico [/bold white]",
             title_align="left",
             border_style="red",
-            box=box.ROUNDED
+            box=box.ROUNDED,
+            subtitle="[dim]Ejecuta 'login' para acceder o 'institucion' para cambiar de universidad[/dim]"
         ))
 
 
@@ -580,11 +607,92 @@ def cmd_sync():
 
 def cmd_logout():
     """Cierra la sesión actual y elimina credenciales locales."""
+    inst = get_active_institution()
     print_header()
     if logout():
-        console.print("[bold green]✔ Sesión cerrada exitosamente. Credenciales eliminadas.[/bold green]")
+        console.print(f"[bold green]✔ Sesión de {inst.get('short_name', 'Blackboard')} cerrada exitosamente. Credenciales eliminadas.[/bold green]")
     else:
         console.print("[bold red]✖ Hubo un problema al intentar cerrar sesión.[/bold red]")
+
+
+def cmd_institution():
+    """Selector y configurador de universidad / Blackboard."""
+    current = get_active_institution()
+    print_header()
+
+    console.print(Panel(
+        f"[bold white]Institución activa:[/bold white] [{current.get('color', 'white')}]{current.get('name')}[/{current.get('color', 'white')}]\n"
+        f"[dim white]Servidor:[/dim white] [dim]{current.get('base_url')}[/dim]\n\n"
+        f"[dim grey70]Cada universidad mantiene sus propias sesiones, credenciales y caché de descargas de forma aislada.[/dim grey70]",
+        title="[bold white] 🏫 Configuración de Universidad [/bold white]",
+        title_align="left",
+        border_style="grey37",
+        box=box.ROUNDED
+    ))
+
+    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
+    table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
+    table.add_column("Institución", style="bold white", width=38)
+    table.add_column("URL del Aula Virtual", style="dim grey70")
+
+    table.add_row("[1]", "UPC (Univ. Peruana de Ciencias Aplicadas)", "aulavirtual.upc.edu.pe")
+    table.add_row("[2]", "UCV (Universidad César Vallejo)", "ucv.blackboard.com")
+    table.add_row("[3]", "UPN (Universidad Privada del Norte)", "upn.blackboard.com")
+    table.add_row("[4]", "Personalizada (Cualquier Blackboard Ultra)", "Ingresar enlace manualmente")
+    table.add_row("", "", "")
+    table.add_row("[0]", "Cancelar / Mantener actual", "")
+
+    console.print(table)
+    console.print()
+
+    choice = Prompt.ask("[bold bright_cyan]universidad[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=["1", "2", "3", "4", "0"], default="0")
+
+    if choice == "0":
+        return
+
+    if choice == "1":
+        new_inst = set_active_institution("upc")
+        console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
+    elif choice == "2":
+        new_inst = set_active_institution("ucv")
+        console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
+    elif choice == "3":
+        new_inst = set_active_institution("upn")
+        console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
+    elif choice == "4":
+        console.print("\n[dim]Ingresa la URL o dominio del aula virtual de tu universidad.[/dim]")
+        console.print("[dim]Ejemplos: [cyan]ucv.blackboard.com[/cyan] o [cyan]https://miuniversidad.blackboard.com[/cyan][/dim]\n")
+        raw_url = Prompt.ask("[bold bright_cyan]URL de Blackboard[/bold bright_cyan]")
+        if not raw_url.strip():
+            console.print("[yellow]Operación cancelada: URL vacía.[/yellow]")
+            return
+
+        with console.status("[bold cyan]Verificando compatibilidad con Blackboard Learn / Ultra...[/bold cyan]"):
+            ok, desc = validate_blackboard_url(raw_url)
+
+        if ok:
+            console.print(f"[bold green]✔ Servidor compatible detectado:[/bold green] {desc}")
+            custom_name = Prompt.ask("[bold bright_cyan]Nombre o sigla de la institución[/bold bright_cyan] (ej: UDEP, PUCP, UNMSM)", default="")
+            new_inst = set_active_institution("custom", custom_url=raw_url, custom_name=custom_name)
+            console.print(f"\n[bold green]✔ Universidad configurada exitosamente:[/bold green] [bold white]{new_inst['name']}[/bold white] ({new_inst['base_url']})")
+        else:
+            console.print(f"[bold red]✖ No se pudo verificar la compatibilidad de la URL:[/bold red] {desc}")
+            proceed = Confirm.ask("¿Deseas guardarla de todas maneras?", default=False)
+            if proceed:
+                custom_name = Prompt.ask("[bold bright_cyan]Nombre o sigla de la institución[/bold bright_cyan]", default="")
+                new_inst = set_active_institution("custom", custom_url=raw_url, custom_name=custom_name)
+                console.print(f"\n[yellow]⚠ Configuración guardada:[/yellow] [bold white]{new_inst['name']}[/bold white] ({new_inst['base_url']})")
+            else:
+                console.print("[dim]Operación cancelada sin cambios.[/dim]")
+                return
+
+    # Preguntar si desea iniciar sesión de inmediato si no hay cookies guardadas
+    new_user = verify_session()
+    if not new_user:
+        start_login = Confirm.ask("\n¿Deseas iniciar sesión ahora en esta institución?", default=True)
+        if start_login:
+            interactive_login()
+
 
 def interactive_menu():
     """Bucle principal del menú interactivo estilo Claude Code / Antigravity."""
@@ -612,6 +720,7 @@ def interactive_menu():
         menu_table.add_row("[5]", "🔐", "login", "Autenticar cuenta o iniciar sesión")
         menu_table.add_row("[6]", "🚪", "logout", "Cerrar sesión y borrar credenciales")
         menu_table.add_row("[7]", "🤖", "notebook", "Exportar a Gemini Notebook")
+        menu_table.add_row("[8]", "🏫", "institucion", "Cambiar de universidad (UPC, UCV, UPN o URL)")
         menu_table.add_row("", "", "", "")
         menu_table.add_row("[0]", "❌", "exit", "Salir")
 
@@ -644,6 +753,8 @@ def interactive_menu():
             cmd_logout()
         elif choice in ["7", "notebook", "export"]:
             cmd_notebook()
+        elif choice in ["8", "institucion", "universidad", "university", "inst"]:
+            cmd_institution()
         elif choice in ["0", "exit", "quit", "q"]:
             console.print()
             console.print("[dim grey50]  Cerrando Blackboard CLI...[/dim grey50]")
@@ -674,9 +785,11 @@ def main():
                 cmd_logout()
             elif arg in ["notebook", "export"]:
                 cmd_notebook()
+            elif arg in ["institucion", "universidad", "university", "inst"]:
+                cmd_institution()
             else:
                 console.print(f"[red]Comando desconocido: {arg}[/red]")
-                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion")
         else:
             interactive_menu()
     except KeyboardInterrupt:

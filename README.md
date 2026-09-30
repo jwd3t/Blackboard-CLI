@@ -1,6 +1,6 @@
-# 🎓 Blackboard CLI (UPC) — AI Study Notebook Sync
+# 🎓 Blackboard CLI — AI Study Notebook Sync
 
-Herramienta de consola moderna y profesional para **Blackboard Ultra (UPC)**. Sincroniza tus cursos, materiales semanales, evaluaciones y anuncios oficiales, organizándolos en **Cuadernos de Estudio en Markdown** listos para ser leídos por ti o por cualquier Inteligencia Artificial (Antigravity, Claude, ChatGPT, Gemini, etc.).
+Herramienta de consola moderna y profesional para **Blackboard Ultra Multi-Institución** (UPC, UCV - Universidad César Vallejo, UPN - Universidad Privada del Norte, y cualquier aula virtual Blackboard Learn / Ultra). Sincroniza tus cursos, materiales semanales, evaluaciones y anuncios oficiales, organizándolos en **Cuadernos de Estudio en Markdown** listos para ser leídos por ti o por cualquier Inteligencia Artificial (Antigravity, Claude, ChatGPT, Gemini, etc.).
 
 ---
 
@@ -11,14 +11,14 @@ No necesitas configurar entornos manualmente. El programa incluye gestores autom
 1. **Descarga y descomprime:**
    - Descarga el archivo [Blackboard-CLI.zip](https://github.com/jwd3t/Blackboard-CLI/releases) desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
 2. **Ejecutar:**
-   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v2.2.0-Windows.bat`).
+   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v3.0.0-Windows.bat`).
    - **En Mac:** Haz doble clic en **`BlackboardCLI-v*.command`** (o en la terminal: `./BlackboardCLI-v*.command`).
    - **En Linux:** Abre la terminal en la carpeta y ejecuta **`./BlackboardCLI-v*.sh`**.
    - *Nota de la primera vez:* En su primer arranque, el programa creará automáticamente un entorno virtual aislado (`.venv`) e instalará las librerías necesarias. **No dejará ningún residuo en tu sistema.**
-3. **Iniciar Sesión:**
-   - En el menú principal, selecciona la opción `[5] login`.
-   - Se abrirá una ventana de navegador donde podrás ingresar con tu correo UPC (`@upc.edu.pe`), contraseña institucional y confirmar tu verificación en dos pasos (2FA).
-   - ¡Listo! Tu sesión quedará guardada de forma segura localmente.
+3. **Elegir Universidad e Iniciar Sesión:**
+   - Por defecto está configurado para la **UPC**, pero puedes cambiar a **UCV**, **UPN** o **cualquier enlace personalizado de Blackboard** usando la opción `[8] institucion`.
+   - Selecciona `[5] login`. Se abrirá una ventana de navegador donde podrás ingresar con tu cuenta institucional, contraseña y confirmar tu verificación en dos pasos (2FA).
+   - ¡Listo! Las credenciales y sesiones se guardan de forma aislada e independiente para cada universidad.
 
 ---
 
@@ -31,10 +31,11 @@ Al iniciar la aplicación, verás la consola interactiva con las siguientes opci
 | `[1]` | `sync` | **Sincronizador:** Permite descargar todo el semestre o elegir un curso y semana específica. |
 | `[2]` | `agenda` | **Radar de Evaluaciones:** Lista exámenes, tareas y fechas de entrega ordenadas cronológicamente. |
 | `[3]` | `cursos` | **Asignaturas:** Tabla con tus cursos activos del ciclo y sus códigos. |
-| `[4]` | `status` | **Diagnóstico:** Revisa el estado de la conexión con el servidor Ultra y tu perfil de estudiante. |
-| `[5]` | `login` | **Iniciar Sesión:** Abre el navegador para autenticarte vía Microsoft 365 / SSO. |
-| `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies locales de tu PC. |
+| `[4]` | `status` | **Diagnóstico:** Revisa el estado de la conexión con el servidor Ultra, universidad activa y perfil. |
+| `[5]` | `login` | **Iniciar Sesión:** Abre el navegador para autenticarte vía SSO / 2FA en la universidad activa. |
+| `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies de la universidad activa. |
 | `[7]` | `notebook`| **Exportar a Gemini Notebook:** Genera una carpeta plana (`gemini_notebook/`) optimizada para NotebookLM. |
+| `[8]` | `institucion`| **Cambiar Universidad:** Alterna entre UPC, UCV, UPN o agrega cualquier URL de Blackboard Learn. |
 | `[0]` | `exit` | Cierra la aplicación. |
 
 > 💡 **Tip de Navegación:** Dentro de los menús de sincronización puedes escribir **`v`** en cualquier momento para volver a la pantalla anterior sin cerrar el programa.

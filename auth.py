@@ -1,6 +1,6 @@
 """
-Módulo de autenticación y manejo de sesión para Blackboard Ultra UPC.
-Utiliza Playwright con un perfil persistente para permitir inicio de sesión SSO/2FA
+Módulo de autenticación y manejo de sesión para Blackboard Ultra Multi-Universidad.
+Utiliza Playwright con un perfil persistente por institución para permitir inicio de sesión SSO/2FA
 y extrae las cookies de sesión para consultas API rápidas.
 """
 from __future__ import annotations
@@ -8,8 +8,9 @@ from __future__ import annotations
 import sys
 import json
 import time
-import httpx
+import urllib.parse
 from pathlib import Path
+import httpx
 from playwright.sync_api import sync_playwright
 
 if sys.platform == "win32":
@@ -19,22 +20,29 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from config import BASE_URL, SESSION_DIR, COOKIES_FILE
+from config import (
+    get_base_url,
+    get_cookies_file,
+    get_browser_session_dir,
+    get_active_institution,
+    SESSION_DIR,
+)
 
 
-def get_stored_cookies() -> dict[str, str] | None:
-    """Lee las cookies almacenadas en disco."""
-    if not COOKIES_FILE.exists():
+def get_stored_cookies(cookies_file: Path | None = None) -> dict[str, str] | None:
+    """Lee las cookies almacenadas en disco para la institución activa."""
+    target_file = cookies_file or get_cookies_file()
+    if not target_file.exists():
         return None
     try:
-        with open(COOKIES_FILE, "r", encoding="utf-8") as f:
+        with open(target_file, "r", encoding="utf-8") as f:
             cookies_list = json.load(f)
             return {c["name"]: c["value"] for c in cookies_list}
     except Exception:
         return None
 
 
-def verify_session(cookies: dict[str, str] | None = None) -> dict | None:
+def verify_session(cookies: dict[str, str] | None = None, base_url: str | None = None) -> dict | None:
     """
     Verifica si la sesión actual sigue siendo válida contra la API de Blackboard.
     Retorna los datos del usuario si es válida, o None si expiró.
@@ -44,8 +52,9 @@ def verify_session(cookies: dict[str, str] | None = None) -> dict | None:
     if not cookies:
         return None
 
+    target_base = base_url or get_base_url()
     try:
-        url = f"{BASE_URL}/learn/api/public/v1/users/me"
+        url = f"{target_base}/learn/api/public/v1/users/me"
         xsrf = cookies.get("XSRF-TOKEN", "")
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -61,28 +70,42 @@ def verify_session(cookies: dict[str, str] | None = None) -> dict | None:
     return None
 
 
-def interactive_login(timeout_seconds: int = 180) -> bool:
+def interactive_login(
+    timeout_seconds: int = 180,
+    base_url: str | None = None,
+    cookies_file: Path | None = None,
+    session_dir: Path | None = None
+) -> bool:
     """
     Abre una ventana de navegador para que el estudiante inicie sesión
-    con su cuenta institucional de la UPC (@upc.edu.pe) y confirme el 2FA.
+    con sus credenciales institucionales y confirme el 2FA si corresponde.
     Guarda las cookies una vez completado el acceso.
     """
-    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    target_base = base_url or get_base_url()
+    target_cookies = cookies_file or get_cookies_file()
+    target_browser_dir = session_dir or get_browser_session_dir()
+    inst = get_active_institution()
+    inst_name = inst.get("name", "Blackboard Ultra")
+    domain = urllib.parse.urlparse(target_base).netloc.lower()
 
-    print("\n[!] Abriendo navegador para inicio de sesión en UPC Blackboard Ultra...")
-    print("[!] Por favor ingresa tu correo @upc.edu.pe, contraseña y confirma el 2FA si te lo solicita.")
+    target_browser_dir.mkdir(parents=True, exist_ok=True)
+    target_cookies.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n[!] Abriendo navegador para inicio de sesión en Blackboard Ultra ({inst_name})...")
+    print(f"[*] Servidor: {target_base}")
+    print("[!] Por favor ingresa tus credenciales institucionales y confirma el 2FA si te lo solicita.")
 
     with sync_playwright() as p:
-        # Usamos persistent_context para que recuerde tokens de Microsoft y Blackboard
+        # Usamos persistent_context para que recuerde tokens de Microsoft/Google y Blackboard de esta institución
         context = p.chromium.launch_persistent_context(
-            user_data_dir=str(SESSION_DIR),
+            user_data_dir=str(target_browser_dir),
             headless=False,
             viewport={"width": 1280, "height": 800},
             args=["--disable-blink-features=AutomationControlled"]
         )
 
         page = context.new_page() if not context.pages else context.pages[0]
-        page.goto(BASE_URL)
+        page.goto(target_base)
 
         print("[*] Esperando a que completes el inicio de sesión en el navegador...")
         print("[*] (Si ya ves tu aula virtual en la pantalla, puedes presionar ENTER en esta consola para continuar)\n")
@@ -116,9 +139,9 @@ def interactive_login(timeout_seconds: int = 180) -> bool:
             all_urls = [p.url for p in context.pages]
             for u in all_urls:
                 u_lower = u.lower()
-                if "aulavirtual.upc.edu.pe" in u_lower:
+                if (domain and domain in u_lower) or "blackboard" in u_lower or "aulavirtual" in u_lower:
                     if any(path in u_lower for path in ["/ultra", "/webapps/portal", "/webapps/blackboard", "tab_tab_group_id"]):
-                        if "login" not in u_lower and "microsoft" not in u_lower:
+                        if "login" not in u_lower and "microsoft" not in u_lower and "auth" not in u_lower:
                             logged_in = True
                             print(f"\n[✓] ¡Inicio de sesión detectado en: {u}!")
                             break
@@ -129,7 +152,7 @@ def interactive_login(timeout_seconds: int = 180) -> bool:
             raw_cookies = context.cookies()
             cookie_dict = {c["name"]: c["value"] for c in raw_cookies}
             if "BbRouter" in cookie_dict or "XSRF-TOKEN" in cookie_dict:
-                user_data = verify_session(cookie_dict)
+                user_data = verify_session(cookie_dict, base_url=target_base)
                 if user_data:
                     logged_in = True
                     print(f"\n[✓] ¡Sesión API validada para {user_data.get('userName')}!")
@@ -145,21 +168,24 @@ def interactive_login(timeout_seconds: int = 180) -> bool:
         # Esperar 2 segundos para asegurar sincronización de cookies
         time.sleep(2)
         cookies = context.cookies()
-        with open(COOKIES_FILE, "w", encoding="utf-8") as f:
+        with open(target_cookies, "w", encoding="utf-8") as f:
             json.dump(cookies, f, indent=2)
 
         context.close()
-        print(f"[✓] Credenciales y sesión guardadas con éxito en {COOKIES_FILE}")
+        print(f"[✓] Credenciales y sesión guardadas con éxito en {target_cookies.name}")
         return True
 
-def logout() -> bool:
-    """Elimina la sesión y cookies actuales de forma segura."""
+
+def logout(cookies_file: Path | None = None, session_dir: Path | None = None) -> bool:
+    """Elimina la sesión y cookies de la institución activa de forma segura."""
     import shutil
+    target_cookies = cookies_file or get_cookies_file()
+    target_browser = session_dir or get_browser_session_dir()
     try:
-        if COOKIES_FILE.exists():
-            COOKIES_FILE.unlink()
-        if SESSION_DIR.exists():
-            shutil.rmtree(SESSION_DIR, ignore_errors=True)
+        if target_cookies.exists():
+            target_cookies.unlink()
+        if target_browser.exists():
+            shutil.rmtree(target_browser, ignore_errors=True)
         return True
     except Exception as e:
         print(f"Error al cerrar sesión: {e}")
