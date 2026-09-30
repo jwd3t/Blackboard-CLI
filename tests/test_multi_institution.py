@@ -1,5 +1,5 @@
 """
-Pruebas unitarias y de integración para la arquitectura Multi-Institución (v2.3.0).
+Pruebas unitarias y de integración para la arquitectura Multi-Institución (v3.0.0).
 Valida:
 1. Normalización de URLs.
 2. Cambio de institución (UPC, UCV, UPN y personalizada).
@@ -7,7 +7,7 @@ Valida:
 4. Retrocompatibilidad de sesiones v2.x.
 5. Inyección de dependencias en UltraClient y CourseNotebookOrganizer.
 6. Validación de URLs de Blackboard Learn / Ultra.
-7. Verificador de versiones y releases GitHub (v2.3.0).
+7. Verificador de versiones y releases GitHub (v3.0.0).
 8. Confirmaciones unificadas en español (SpanishConfirm [s/n]).
 """
 import os

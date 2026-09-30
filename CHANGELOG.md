@@ -7,7 +7,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-## [2.3.0] - 2026-09-30
+## [3.0.0] - 2026-09-30
 
 ### ✨ Añadido
 - **Control Híbrido y Motor de UI Desacoplado (`src/terminal_ui.py`):**
@@ -16,6 +16,8 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Mecanismo de resiliencia con fallback automático en entornos no interactivos o pipes (`sys.stdin.isatty() == False`) recurriendo a `Prompt.ask()`.
   - Barra de tips didácticos rotativos en español al pie de los menús para enseñar trucos del programa y flujos de estudio con IA.
   - Experiencia unificada de `hybrid_select` en el Menú Principal, Selector de Cursos, Selector de Semanas, Selector de Universidad y Exportador a Gemini Notebook.
+- **Tamaño de Ventana Óptimo por Defecto (120x40):**
+  - Auto-ajuste de consola a 120 columnas por 40 líneas para mostrar el banner ASCII en paralelo sin scroll vertical.
 - **Accesos Rápidos de Sistema (`[o]`, `[g]`, `[w]`):**
   - `[o]` / `abrir`: Abre la carpeta de cuadernos en el Explorador de Windows o Finder de Mac mediante la nueva utilidad `open_in_file_manager` en `src/config.py`.
   - `[g]` / `gemini`: Acceso rápido a las notas optimizadas para arrastrar a Google NotebookLM con tips interactivos.
