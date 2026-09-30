@@ -7,18 +7,22 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-## [3.0.0] - 2026-09-29
+## [3.0.0] - 2026-09-30
 
 ### ✨ Añadido
 - **Soporte Multi-Institución y Genérico:**
-  - Soporte nativo para múltiples universidades: **UPC** (`aulavirtual.upc.edu.pe`), **UCV - Universidad César Vallejo** (`ucv.blackboard.com`) y **UPN - Universidad Privada del Norte** (`upn.blackboard.com`).
-  - Soporte genérico para **cualquier servidor Blackboard Learn / Ultra**: permite ingresar la URL de cualquier universidad y valida automáticamente la compatibilidad con los endpoints de Blackboard Learn REST API (`/learn/api/public/v1/system/version`).
+  - Soporte nativo preconfigurado para múltiples universidades e institutos: **UPC** (`aulavirtual.upc.edu.pe`), **UCV** (`ucv.blackboard.com`), **UPN** (`upn.blackboard.com`) y **SENATI** (`senati.blackboard.com`).
+  - Detección de atajos y dominios de SENATI (`senati`, `senati.pe`, `aulavirtual.senati.edu.pe`).
+  - Soporte genérico para **cualquier servidor Blackboard Learn / Ultra**: permite ingresar la URL de cualquier institución y valida automáticamente la compatibilidad con los endpoints de Blackboard Learn REST API (`/learn/api/public/v1/system/version`).
+- **Resiliencia de navegador con fallback automático (Fix `spawn UNKNOWN`):**
+  - Nuevo lanzador de navegador en cascada: si Chromium es bloqueado por antivirus o falla con `spawn UNKNOWN`, detecta y utiliza de inmediato **Microsoft Edge** (`channel="msedge"`) o **Google Chrome** (`channel="chrome"`) preinstalados en Windows.
+  - Protección ante cierres inesperados de la ventana del navegador sin interrumpir ni crashear el programa.
 - **Aislamiento completo de sesiones por universidad:**
-  - Cookies persistentes separadas por institución (`cookies_upc.json`, `cookies_ucv.json`, etc.) y perfiles de navegador independientes (`browser_upc/`, `browser_ucv/`).
+  - Cookies persistentes separadas por institución (`cookies_upc.json`, `cookies_senati.json`, etc.) y perfiles de navegador independientes (`browser_upc/`, `browser_senati/`).
   - Cambiar de universidad no cierra la sesión ni invalida las credenciales de las otras.
-  - Caché de descargas independiente por universidad (`downloads_cache_<inst>.json`).
-- **Selector interactivo de universidad:**
-  - Nueva opción en el menú interactivo `[8] institucion` y argumento CLI `institucion` para alternar de manera fluida entre universidades o configurar una URL personalizada.
+  - Caché de descargas independiente por institución (`downloads_cache_<inst>.json`).
+- **Selector interactivo de institución:**
+  - Nueva opción en el menú interactivo `[8] institucion` y argumento CLI `institucion` para alternar de manera fluida entre instituciones o configurar una URL personalizada.
 - **Headers y diagnóstico dinámicos:**
   - El banner, barra de estado y tabla de diagnóstico reflejan el nombre de la institución activa, URL base y color temático.
 - **Inyección de dependencias y desacoplamiento (SOLID):**

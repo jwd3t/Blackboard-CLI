@@ -70,6 +70,65 @@ def verify_session(cookies: dict[str, str] | None = None, base_url: str | None =
     return None
 
 
+def _launch_browser_context(playwright_instance, target_browser_dir: Path):
+    """
+    Inicia un contexto de navegador persistente con fallback progresivo:
+    1. Chromium oficial de Playwright.
+    2. Microsoft Edge del sistema (canal 'msedge', preinstalado en el 100% de PCs con Windows).
+    3. Google Chrome del sistema (canal 'chrome').
+    4. Búsqueda directa de ejecutables conocidos en Windows.
+    Retorna (context, browser_name) o (None, None).
+    """
+    abs_dir = str(target_browser_dir.resolve())
+    base_args = [
+        "--disable-blink-features=AutomationControlled",
+        "--no-first-run",
+        "--no-default-browser-check",
+    ]
+
+    candidates = [
+        ("Chromium (Playwright)", {"args": base_args}),
+        ("Microsoft Edge (Sistema)", {"channel": "msedge", "args": base_args}),
+        ("Google Chrome (Sistema)", {"channel": "chrome", "args": base_args}),
+    ]
+
+    if sys.platform == "win32":
+        # Rutas físicas por si el canal de Playwright no resuelve en la instalación local
+        system_paths = [
+            ("Microsoft Edge (Ruta)", Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")),
+            ("Microsoft Edge (Ruta)", Path("C:/Program Files/Microsoft/Edge/Application/msedge.exe")),
+            ("Google Chrome (Ruta)", Path("C:/Program Files/Google/Chrome/Application/chrome.exe")),
+            ("Google Chrome (Ruta)", Path("C:/Program Files (x86)/Google/Chrome/Application/chrome.exe")),
+        ]
+        for name, p in system_paths:
+            if p.exists():
+                candidates.append((name, {"executable_path": str(p), "args": base_args}))
+
+    errors = []
+    for name, kwargs in candidates:
+        try:
+            ctx = playwright_instance.chromium.launch_persistent_context(
+                user_data_dir=abs_dir,
+                headless=False,
+                viewport={"width": 1280, "height": 800},
+                **kwargs
+            )
+            return ctx, name
+        except Exception as e:
+            err_line = str(e).splitlines()[0] if str(e) else "Error desconocido"
+            errors.append((name, err_line))
+
+    print("\n[✖] Error: No se pudo abrir ninguna instancia de navegador.")
+    print("    Detalles de los intentos:")
+    for name, err in errors:
+        print(f"    - {name}: {err[:100]}")
+    print("\n    Sugerencias:")
+    print("    1. Comprueba si tu antivirus o Windows Defender bloqueó la ejecución de Chromium.")
+    print("    2. Asegúrate de tener Microsoft Edge o Google Chrome instalados en tu sistema.")
+    print("    3. Intenta reinstalar Chromium ejecutando: python -m playwright install chromium")
+    return None, None
+
+
 def interactive_login(
     timeout_seconds: int = 180,
     base_url: str | None = None,
@@ -96,16 +155,17 @@ def interactive_login(
     print("[!] Por favor ingresa tus credenciales institucionales y confirma el 2FA si te lo solicita.")
 
     with sync_playwright() as p:
-        # Usamos persistent_context para que recuerde tokens de Microsoft/Google y Blackboard de esta institución
-        context = p.chromium.launch_persistent_context(
-            user_data_dir=str(target_browser_dir),
-            headless=False,
-            viewport={"width": 1280, "height": 800},
-            args=["--disable-blink-features=AutomationControlled"]
-        )
+        context, b_name = _launch_browser_context(p, target_browser_dir)
+        if not context:
+            return False
 
-        page = context.new_page() if not context.pages else context.pages[0]
-        page.goto(target_base)
+        print(f"[✓] Navegador iniciado ({b_name})")
+
+        try:
+            page = context.new_page() if not context.pages else context.pages[0]
+            page.goto(target_base)
+        except Exception as e:
+            print(f"[!] Nota al cargar página inicial: {e}")
 
         print("[*] Esperando a que completes el inicio de sesión en el navegador...")
         print("[*] (Si ya ves tu aula virtual en la pantalla, puedes presionar ENTER en esta consola para continuar)\n")
@@ -128,52 +188,73 @@ def interactive_login(
         start_time = time.time()
         logged_in = False
 
-        while time.time() - start_time < timeout_seconds:
-            # 1. Si el usuario presionó ENTER manualmente
-            if user_pressed_enter:
-                print("\n[i] Capturando sesión a solicitud del usuario...")
-                logged_in = True
-                break
-
-            # 2. Revisar las URLs de todas las pestañas abiertas
-            all_urls = [p.url for p in context.pages]
-            for u in all_urls:
-                u_lower = u.lower()
-                if (domain and domain in u_lower) or "blackboard" in u_lower or "aulavirtual" in u_lower:
-                    if any(path in u_lower for path in ["/ultra", "/webapps/portal", "/webapps/blackboard", "tab_tab_group_id"]):
-                        if "login" not in u_lower and "microsoft" not in u_lower and "auth" not in u_lower:
-                            logged_in = True
-                            print(f"\n[✓] ¡Inicio de sesión detectado en: {u}!")
-                            break
-            if logged_in:
-                break
-
-            # 3. Validar activamente las cookies actuales contra la API de Blackboard
-            raw_cookies = context.cookies()
-            cookie_dict = {c["name"]: c["value"] for c in raw_cookies}
-            if "BbRouter" in cookie_dict or "XSRF-TOKEN" in cookie_dict:
-                user_data = verify_session(cookie_dict, base_url=target_base)
-                if user_data:
+        try:
+            while time.time() - start_time < timeout_seconds:
+                # 1. Si el usuario presionó ENTER manualmente
+                if user_pressed_enter:
+                    print("\n[i] Capturando sesión a solicitud del usuario...")
                     logged_in = True
-                    print(f"\n[✓] ¡Sesión API validada para {user_data.get('userName')}!")
                     break
 
-            time.sleep(1.5)
+                # 2. Revisar si la ventana sigue abierta
+                try:
+                    pages = context.pages
+                    if not pages:
+                        print("\n[!] Se cerró la ventana del navegador.")
+                        break
+                except Exception:
+                    print("\n[!] Se cerró la ventana del navegador.")
+                    break
 
-        if not logged_in:
-            print("\n[X] El tiempo de espera para iniciar sesión ha expirado.")
-            context.close()
-            return False
+                # 3. Revisar las URLs de todas las pestañas abiertas
+                all_urls = [page_item.url for page_item in pages]
+                for u in all_urls:
+                    u_lower = u.lower()
+                    if (domain and domain in u_lower) or "blackboard" in u_lower or "aulavirtual" in u_lower or "senati" in u_lower:
+                        if any(path in u_lower for path in ["/ultra", "/webapps/portal", "/webapps/blackboard", "tab_tab_group_id"]):
+                            if "login" not in u_lower and "microsoft" not in u_lower and "auth" not in u_lower:
+                                logged_in = True
+                                print(f"\n[✓] ¡Inicio de sesión detectado en: {u}!")
+                                break
+                if logged_in:
+                    break
 
-        # Esperar 2 segundos para asegurar sincronización de cookies
-        time.sleep(2)
-        cookies = context.cookies()
-        with open(target_cookies, "w", encoding="utf-8") as f:
-            json.dump(cookies, f, indent=2)
+                # 4. Validar activamente las cookies actuales contra la API de Blackboard
+                try:
+                    raw_cookies = context.cookies()
+                    cookie_dict = {c["name"]: c["value"] for c in raw_cookies}
+                    if "BbRouter" in cookie_dict or "XSRF-TOKEN" in cookie_dict:
+                        user_data = verify_session(cookie_dict, base_url=target_base)
+                        if user_data:
+                            logged_in = True
+                            print(f"\n[✓] ¡Sesión API validada para {user_data.get('userName')}!")
+                            break
+                except Exception:
+                    pass
 
-        context.close()
-        print(f"[✓] Credenciales y sesión guardadas con éxito en {target_cookies.name}")
-        return True
+                time.sleep(1.5)
+
+            if not logged_in:
+                print("\n[X] El tiempo de espera para iniciar sesión ha expirado o se cerró el navegador.")
+                return False
+
+            # Esperar 2 segundos para asegurar sincronización de cookies
+            time.sleep(2)
+            try:
+                cookies = context.cookies()
+                with open(target_cookies, "w", encoding="utf-8") as f:
+                    json.dump(cookies, f, indent=2)
+                print(f"[✓] Credenciales y sesión guardadas con éxito en {target_cookies.name}")
+                return True
+            except Exception as e:
+                print(f"[!] Error al guardar cookies: {e}")
+                return False
+
+        finally:
+            try:
+                context.close()
+            except Exception:
+                pass
 
 
 def logout(cookies_file: Path | None = None, session_dir: Path | None = None) -> bool:

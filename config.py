@@ -43,6 +43,14 @@ DEFAULT_INSTITUTIONS: dict[str, dict] = {
         "domain": "upn.blackboard.com",
         "color": "bright_yellow",
     },
+    "senati": {
+        "id": "senati",
+        "name": "Servicio Nacional de Adiestramiento en Trabajo Industrial (SENATI)",
+        "short_name": "SENATI",
+        "base_url": "https://senati.blackboard.com",
+        "domain": "senati.blackboard.com",
+        "color": "bright_blue",
+    },
     "custom": {
         "id": "custom",
         "name": "Otra Universidad (URL Personalizada)",
@@ -55,10 +63,22 @@ DEFAULT_INSTITUTIONS: dict[str, dict] = {
 
 
 def normalize_url(url: str) -> str:
-    """Normaliza y limpia la URL del aula virtual."""
+    """Normaliza y limpia la URL del aula virtual con soporte de atajos comunes."""
     clean = url.strip()
     if not clean:
         return ""
+
+    clean_lower = clean.lower()
+    # Atajos de instituciones conocidas
+    if clean_lower in ["senati", "senati.pe", "senati.edu.pe", "aulavirtual.senati.edu.pe"]:
+        return "https://senati.blackboard.com"
+    if clean_lower in ["upc", "upc.edu.pe", "aulavirtual.upc.edu.pe"]:
+        return "https://aulavirtual.upc.edu.pe"
+    if clean_lower in ["ucv", "ucv.edu.pe", "ucv.blackboard.com"]:
+        return "https://ucv.blackboard.com"
+    if clean_lower in ["upn", "upn.edu.pe", "upn.blackboard.com"]:
+        return "https://upn.blackboard.com"
+
     if not clean.startswith("http://") and not clean.startswith("https://"):
         clean = f"https://{clean}"
     return clean.rstrip("/")
@@ -74,9 +94,19 @@ def validate_blackboard_url(url: str, timeout: float = 6.0) -> tuple[bool, str]:
     if not norm:
         return False, "URL vacía"
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
     # 1. Probar endpoint oficial de versión de Blackboard Learn REST API
     try:
-        r = httpx.get(f"{norm}/learn/api/public/v1/system/version", follow_redirects=True, timeout=timeout)
+        r = httpx.get(
+            f"{norm}/learn/api/public/v1/system/version",
+            headers=headers,
+            follow_redirects=True,
+            timeout=timeout
+        )
         if r.status_code == 200:
             try:
                 data = r.json()
@@ -90,9 +120,9 @@ def validate_blackboard_url(url: str, timeout: float = 6.0) -> tuple[bool, str]:
 
     # 2. Probar portada o endpoint ultra
     try:
-        r2 = httpx.get(norm, follow_redirects=True, timeout=timeout)
+        r2 = httpx.get(norm, headers=headers, follow_redirects=True, timeout=timeout)
         text_lower = r2.text.lower()
-        if any(k in text_lower for k in ["blackboard", "ultra", "bb-login", "bb-navigation"]):
+        if any(k in text_lower for k in ["blackboard", "ultra", "bb-login", "bb-navigation", "senati"]):
             return True, "Blackboard Learn Ultra detectado"
     except Exception as e:
         return False, f"No se pudo conectar a la URL: {e}"

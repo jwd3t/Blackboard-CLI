@@ -638,14 +638,15 @@ def cmd_institution():
     table.add_row("[1]", "UPC (Univ. Peruana de Ciencias Aplicadas)", "aulavirtual.upc.edu.pe")
     table.add_row("[2]", "UCV (Universidad César Vallejo)", "ucv.blackboard.com")
     table.add_row("[3]", "UPN (Universidad Privada del Norte)", "upn.blackboard.com")
-    table.add_row("[4]", "Personalizada (Cualquier Blackboard Ultra)", "Ingresar enlace manualmente")
+    table.add_row("[4]", "SENATI (Servicio Nac. Adiestramiento Ind.)", "senati.blackboard.com")
+    table.add_row("[5]", "Personalizada (Cualquier Blackboard Ultra)", "Ingresar enlace manualmente")
     table.add_row("", "", "")
     table.add_row("[0]", "Cancelar / Mantener actual", "")
 
     console.print(table)
     console.print()
 
-    choice = Prompt.ask("[bold bright_cyan]universidad[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=["1", "2", "3", "4", "0"], default="0")
+    choice = Prompt.ask("[bold bright_cyan]universidad[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=["1", "2", "3", "4", "5", "0"], default="0")
 
     if choice == "0":
         return
@@ -660,8 +661,11 @@ def cmd_institution():
         new_inst = set_active_institution("upn")
         console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
     elif choice == "4":
-        console.print("\n[dim]Ingresa la URL o dominio del aula virtual de tu universidad.[/dim]")
-        console.print("[dim]Ejemplos: [cyan]ucv.blackboard.com[/cyan] o [cyan]https://miuniversidad.blackboard.com[/cyan][/dim]\n")
+        new_inst = set_active_institution("senati")
+        console.print(f"\n[bold green]✔ Institución cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
+    elif choice == "5":
+        console.print("\n[dim]Ingresa la URL o dominio del aula virtual de tu universidad o instituto.[/dim]")
+        console.print("[dim]Ejemplos: [cyan]senati.blackboard.com[/cyan], [cyan]ucv.blackboard.com[/cyan] o [cyan]https://miinstituto.blackboard.com[/cyan][/dim]\n")
         raw_url = Prompt.ask("[bold bright_cyan]URL de Blackboard[/bold bright_cyan]")
         if not raw_url.strip():
             console.print("[yellow]Operación cancelada: URL vacía.[/yellow]")
@@ -672,9 +676,9 @@ def cmd_institution():
 
         if ok:
             console.print(f"[bold green]✔ Servidor compatible detectado:[/bold green] {desc}")
-            custom_name = Prompt.ask("[bold bright_cyan]Nombre o sigla de la institución[/bold bright_cyan] (ej: UDEP, PUCP, UNMSM)", default="")
+            custom_name = Prompt.ask("[bold bright_cyan]Nombre o sigla de la institución[/bold bright_cyan] (ej: SENATI, UDEP, PUCP)", default="")
             new_inst = set_active_institution("custom", custom_url=raw_url, custom_name=custom_name)
-            console.print(f"\n[bold green]✔ Universidad configurada exitosamente:[/bold green] [bold white]{new_inst['name']}[/bold white] ({new_inst['base_url']})")
+            console.print(f"\n[bold green]✔ Institución configurada exitosamente:[/bold green] [bold white]{new_inst['name']}[/bold white] ({new_inst['base_url']})")
         else:
             console.print(f"[bold red]✖ No se pudo verificar la compatibilidad de la URL:[/bold red] {desc}")
             proceed = Confirm.ask("¿Deseas guardarla de todas maneras?", default=False)
@@ -720,7 +724,7 @@ def interactive_menu():
         menu_table.add_row("[5]", "🔐", "login", "Autenticar cuenta o iniciar sesión")
         menu_table.add_row("[6]", "🚪", "logout", "Cerrar sesión y borrar credenciales")
         menu_table.add_row("[7]", "🤖", "notebook", "Exportar a Gemini Notebook")
-        menu_table.add_row("[8]", "🏫", "institucion", "Cambiar de universidad (UPC, UCV, UPN o URL)")
+        menu_table.add_row("[8]", "🏫", "institucion", "Cambiar universidad o instituto (UPC, UCV, SENATI...)")
         menu_table.add_row("", "", "", "")
         menu_table.add_row("[0]", "❌", "exit", "Salir")
 

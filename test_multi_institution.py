@@ -56,8 +56,23 @@ class TestMultiInstitution(unittest.TestCase):
         self.assertEqual(normalize_url("  aulavirtual.upc.edu.pe  "), "https://aulavirtual.upc.edu.pe")
         self.assertEqual(normalize_url(""), "")
 
+        # Atajos de SENATI
+        self.assertEqual(normalize_url("senati"), "https://senati.blackboard.com")
+        self.assertEqual(normalize_url("senati.pe"), "https://senati.blackboard.com")
+        self.assertEqual(normalize_url("senati.edu.pe"), "https://senati.blackboard.com")
+        self.assertEqual(normalize_url("aulavirtual.senati.edu.pe"), "https://senati.blackboard.com")
+
     def test_set_active_institution_predefined(self):
-        """Verifica el cambio a instituciones predefinidas (UPC, UCV, UPN)."""
+        """Verifica el cambio a instituciones predefinidas (UPC, UCV, UPN, SENATI)."""
+        # SENATI
+        inst_senati = set_active_institution("senati")
+        self.assertEqual(inst_senati["id"], "senati")
+        self.assertEqual(inst_senati["base_url"], "https://senati.blackboard.com")
+        self.assertEqual(get_base_url(), "https://senati.blackboard.com")
+        self.assertTrue(get_cookies_file().name.endswith("cookies_senati.json"))
+        self.assertTrue(get_downloads_cache_file().name.endswith("downloads_cache_senati.json"))
+        self.assertTrue(get_browser_session_dir().name.endswith("browser_senati"))
+
         # UCV
         inst_ucv = set_active_institution("ucv")
         self.assertEqual(inst_ucv["id"], "ucv")
@@ -120,17 +135,22 @@ class TestMultiInstitution(unittest.TestCase):
         set_active_institution("ucv")
         cookies_ucv = get_cookies_file()
 
+        # SENATI
+        set_active_institution("senati")
+        cookies_senati = get_cookies_file()
+
         # UPN
         set_active_institution("upn")
         cookies_upn = get_cookies_file()
 
         self.assertNotEqual(cookies_upc, cookies_ucv)
-        self.assertNotEqual(cookies_ucv, cookies_upn)
-        self.assertNotEqual(cookies_upc, cookies_upn)
+        self.assertNotEqual(cookies_ucv, cookies_senati)
+        self.assertNotEqual(cookies_senati, cookies_upn)
+        self.assertNotEqual(cookies_upc, cookies_senati)
 
     def test_ultra_client_dependency_injection(self):
         """Verifica que UltraClient acepte base_url y cache_file inyectados."""
-        custom_base = "https://ucv.blackboard.com"
+        custom_base = "https://senati.blackboard.com"
         temp_cache = Path(self.temp_dir) / "test_cache.json"
 
         client = UltraClient(base_url=custom_base, cache_file=temp_cache)
@@ -148,7 +168,7 @@ class TestMultiInstitution(unittest.TestCase):
     def test_organizer_output_dir_injection(self):
         """Verifica que CourseNotebookOrganizer permita un output_dir personalizado."""
         temp_output = Path(self.temp_dir) / "mis_cuadernos"
-        client = UltraClient(base_url="https://ucv.blackboard.com")
+        client = UltraClient(base_url="https://senati.blackboard.com")
         organizer = CourseNotebookOrganizer(client, output_dir=temp_output)
 
         self.assertEqual(organizer.output_dir, temp_output)
@@ -156,12 +176,17 @@ class TestMultiInstitution(unittest.TestCase):
 
     def test_validate_blackboard_url(self):
         """Verifica el validador de endpoints de Blackboard Learn Ultra."""
-        # 1. UCV (servidor real verificado)
+        # 1. SENATI (servidor oficial verificado)
+        is_valid_senati, msg_senati = validate_blackboard_url("https://senati.blackboard.com")
+        self.assertTrue(is_valid_senati, f"SENATI debería ser válida: {msg_senati}")
+        self.assertIn("Blackboard", msg_senati)
+
+        # 2. UCV (servidor real verificado)
         is_valid, msg = validate_blackboard_url("https://ucv.blackboard.com")
         self.assertTrue(is_valid, f"UCV debería ser válida: {msg}")
         self.assertIn("Blackboard", msg)
 
-        # 2. Servidor inexistente / inválido
+        # 3. Servidor inexistente / inválido
         is_invalid, err_msg = validate_blackboard_url("https://esta-url-no-existe-12345.com", timeout=2.0)
         self.assertFalse(is_invalid)
 
