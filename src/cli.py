@@ -711,13 +711,13 @@ def cmd_institution(is_first_time: bool = False):
 
     table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
     table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-    table.add_column("Institución", style="bold white", width=42)
-    table.add_column("URL del Aula Virtual", style="dim grey70")
+    table.add_column("Institución", style="bold white", no_wrap=True)
+    table.add_column("URL del Aula Virtual", style="dim grey70", no_wrap=True)
 
     table.add_row("[1]", "UPC (Univ. Peruana de Ciencias Aplicadas)", "aulavirtual.upc.edu.pe")
     table.add_row("[2]", "UCV (Universidad César Vallejo)", "ucv.blackboard.com")
     table.add_row("[3]", "UPN (Universidad Privada del Norte)", "upn.blackboard.com")
-    table.add_row("[4]", "SENATI (Servicio Nac. Adiestramiento Ind.)", "senati.blackboard.com")
+    table.add_row("[4]", "SENATI", "senati.blackboard.com")
     table.add_row("[5]", "Personalizada (Cualquier Blackboard Ultra)", "Ingresar enlace manualmente")
 
     valid_choices = ["1", "2", "3", "4", "5"]
