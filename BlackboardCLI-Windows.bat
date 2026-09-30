@@ -99,13 +99,17 @@ echo.
 if errorlevel 1 (
     echo [!] No se pudo crear el entorno virtual automaticamente.
     echo [!] Ejecutando con el Python del sistema...
-    %PY_CMD% cli.py %*
+    %PY_CMD% src\cli.py %*
     goto :finish
 )
 
 echo [*] Instalando librerias necesarias en .venv...
 ".venv\Scripts\python.exe" -m pip install --upgrade pip >nul 2>&1
-".venv\Scripts\python.exe" -m pip install -r requirements.txt
+if exist "src\requirements.txt" (
+    ".venv\Scripts\python.exe" -m pip install -r src\requirements.txt
+) else (
+    ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+)
 if errorlevel 1 (
     echo [X] Error al instalar las dependencias en .venv.
     pause
@@ -120,7 +124,7 @@ echo [v] Entorno virtual listo. Iniciando Blackboard CLI...
 echo.
 
 :execute_venv
-".venv\Scripts\python.exe" cli.py %*
+".venv\Scripts\python.exe" src\cli.py %*
 
 :finish
 if errorlevel 1 (

@@ -9,6 +9,11 @@ import subprocess
 import time
 from pathlib import Path
 
+# Asegurar que el directorio de src/ esté en sys.path para importaciones entre módulos
+_SRC_DIR = Path(__file__).resolve().parent
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
 # Asegurar codificación UTF-8 en consola de Windows
 if sys.platform == "win32":
     try:
@@ -30,7 +35,9 @@ def auto_setup():
         import dateutil
     except ImportError:
         print("[!] Instalando librerias requeridas de Blackboard CLI...")
-        req_file = Path(__file__).parent / "requirements.txt"
+        req_file = _SRC_DIR / "requirements.txt"
+        if not req_file.exists():
+            req_file = _SRC_DIR.parent / "requirements.txt"
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
 
     try:

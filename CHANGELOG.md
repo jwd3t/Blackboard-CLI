@@ -25,6 +25,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Nueva opción en el menú interactivo `[8] institucion` y argumento CLI `institucion` para alternar de manera fluida entre instituciones o configurar una URL personalizada.
 - **Headers y diagnóstico dinámicos:**
   - El banner, barra de estado y tabla de diagnóstico reflejan el nombre de la institución activa, URL base y color temático.
+- **Reorganización modular limpia (`src/` y `tests/`):**
+  - Todo el código fuente (`cli.py`, `auth.py`, `config.py`, `organizer.py`, `ultra_client.py`, `requirements.txt`) se agrupó dentro de la carpeta `src/`.
+  - Las pruebas unitarias se estructuraron dentro del directorio `tests/`.
+  - La raíz del proyecto y el paquete descargable ZIP quedan despejados visualmente con los ejecutables y documentación destacados (`BlackboardCLI-Windows.bat`, etc.), sin archivos de código dispersos.
 - **Inyección de dependencias y desacoplamiento (SOLID):**
   - `UltraClient` y `CourseNotebookOrganizer` ahora permiten inyectar URLs base, rutas de caché y directorios de salida arbitrarios.
 - **Retrocompatibilidad transparente:**

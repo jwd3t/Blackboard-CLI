@@ -9,11 +9,16 @@ Valida:
 6. Validación de URLs de Blackboard Learn / Ultra.
 """
 import os
+import sys
 import json
 import shutil
 import tempfile
 from pathlib import Path
 import unittest
+
+SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from config import (
     normalize_url,

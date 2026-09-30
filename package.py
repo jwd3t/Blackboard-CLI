@@ -12,19 +12,22 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(BASE_DIR / "src"))
+
 from config import VERSION
 
-BASE_DIR = Path(__file__).resolve().parent
 ZIP_NAME = BASE_DIR / f"Blackboard-CLI-v{VERSION}.zip"
 
 # Archivos base del proyecto
 FILES_TO_INCLUDE = [
-    "cli.py",
-    "ultra_client.py",
-    "organizer.py",
-    "auth.py",
-    "config.py",
-    "requirements.txt",
+    "src/cli.py",
+    "src/ultra_client.py",
+    "src/organizer.py",
+    "src/auth.py",
+    "src/config.py",
+    "src/requirements.txt",
+    "src/__init__.py",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",

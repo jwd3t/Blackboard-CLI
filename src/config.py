@@ -11,8 +11,8 @@ from pathlib import Path
 # Versión del software
 VERSION = "3.0.0"
 
-# Rutas de almacenamiento local
-BASE_DIR = Path(__file__).resolve().parent
+# Rutas de almacenamiento local (la raíz del proyecto es el padre de src/)
+BASE_DIR = Path(__file__).resolve().parent.parent
 SESSION_DIR = BASE_DIR / ".session_data"
 ACTIVE_INSTITUTION_FILE = SESSION_DIR / "active_institution.json"
 OUTPUT_DIR = BASE_DIR / "cuadernos"

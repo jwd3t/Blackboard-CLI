@@ -65,7 +65,7 @@ fi
 
 # 2. Si el entorno virtual ya existe y está configurado, ejecutar directamente
 if [ -f "$VENV_PY" ]; then
-    exec "$VENV_PY" "$DIR/cli.py" "$@"
+    exec "$VENV_PY" "$DIR/src/cli.py" "$@"
 fi
 
 # 3. Crear entorno virtual (.venv) por primera vez
@@ -76,14 +76,16 @@ echo ""
 if ! "$PY_CMD" -m venv "$VENV_DIR"; then
     echo "[!] No se pudo crear el entorno virtual automáticamente con $PY_CMD."
     echo "[!] Intentando ejecutar directamente con el Python del sistema..."
-    exec "$PY_CMD" "$DIR/cli.py" "$@"
+    exec "$PY_CMD" "$DIR/src/cli.py" "$@"
 fi
 
 # 4. Instalar librerías requeridas en .venv
 echo "[*] Instalando dependencias en .venv..."
 "$VENV_PY" -m pip install --upgrade pip >/dev/null 2>&1 || true
 
-if ! "$VENV_PY" -m pip install -r "$DIR/requirements.txt"; then
+REQ_FILE="$DIR/src/requirements.txt"
+[ ! -f "$REQ_FILE" ] && REQ_FILE="$DIR/requirements.txt"
+if ! "$VENV_PY" -m pip install -r "$REQ_FILE"; then
     echo "[X] Error al instalar las dependencias en .venv."
     exit 1
 fi

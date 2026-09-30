@@ -93,6 +93,19 @@ Una vez descargados tus cuadernos, puedes abrir la carpeta en tu editor favorito
 * **macOS:** macOS Catalina (10.15) o superior.
 * Tener Python 3.9 o superior instalado (Python 3.10+ recomendado; en Windows marcar *"Add python.exe to PATH"*; en Mac instalar vía `brew install python` o python.org). Los scripts de inicio se encargarán de todo lo demás.
 
+### 💻 Ejecución directa con Python (Desarrolladores)
+Si clonas el repositorio y deseas ejecutar el código directamente sin los lanzadores `.bat`/`.sh`:
+```bash
+pip install -r src/requirements.txt
+python src/cli.py
+```
+
+Para correr las pruebas unitarias:
+```bash
+python tests/test_multi_institution.py
+python tests/test_gemini_export.py
+```
+
 ---
 
 ## 📄 Licencia
