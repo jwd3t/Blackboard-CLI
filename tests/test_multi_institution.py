@@ -24,6 +24,7 @@ from config import (
     normalize_url,
     get_active_institution,
     set_active_institution,
+    is_institution_configured,
     get_base_url,
     get_cookies_file,
     get_downloads_cache_file,
@@ -222,6 +223,18 @@ class TestMultiInstitution(unittest.TestCase):
         # Dominios externos ignorados para Blackboard
         self.assertNotIn("ESTSAUTH", extracted)
         self.assertNotIn("SAML_COOKIE", extracted)
+
+    def test_is_institution_configured(self):
+        """Verifica que el estado de configuración inicial se detecte correctamente."""
+        # Al borrar active_institution.json, no debe estar configurado
+        if ACTIVE_INSTITUTION_FILE.exists():
+            ACTIVE_INSTITUTION_FILE.unlink()
+        self.assertFalse(is_institution_configured())
+
+        # Al guardar una institución, debe marcarse como configurado
+        set_active_institution("senati")
+        self.assertTrue(is_institution_configured())
+        self.assertEqual(get_active_institution()["id"], "senati")
 
 
 if __name__ == "__main__":

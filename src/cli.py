@@ -76,6 +76,7 @@ from config import (
     get_base_url,
     get_active_institution,
     set_active_institution,
+    is_institution_configured,
     DEFAULT_INSTITUTIONS,
     validate_blackboard_url,
     normalize_url,
@@ -165,10 +166,16 @@ def print_header(user: dict | None = None):
         fallback_table.add_row(TEXT_FULL)
         console.print(fallback_table, justify="center")
 
-    inst = get_active_institution()
-    short_name = inst.get("short_name", "UPC")
-    inst_color = inst.get("color", "bright_cyan")
-    base_url = get_base_url()
+    inst_configured = is_institution_configured()
+    if inst_configured:
+        inst = get_active_institution()
+        short_name = inst.get("short_name", "Blackboard")
+        inst_color = inst.get("color", "bright_cyan")
+        base_url = get_base_url()
+    else:
+        short_name = "Blackboard Ultra"
+        inst_color = "bright_cyan"
+        base_url = ""
 
     # Tagline + version pill
     tagline = Text(justify="center")
@@ -183,7 +190,7 @@ def print_header(user: dict | None = None):
 
     # Status bar
     status_bar = Text()
-    if user:
+    if user and inst_configured:
         name = f"{user.get('name', {}).get('given', '')} {user.get('name', {}).get('family', '')}".strip()
         student_id = user.get("studentId") or user.get("userName") or "ID N/A"
         status_bar.append("  ● ", style="bold green")
@@ -194,13 +201,18 @@ def print_header(user: dict | None = None):
         status_bar.append("Conectado", style="green")
         status_bar.append("  │  ", style="dim grey42")
         status_bar.append(f"{base_url.replace('https://', '')}", style="dim grey50")
-    else:
+    elif inst_configured:
         status_bar.append("  ○ ", style="bold yellow")
         status_bar.append(f"Sesión no iniciada ({short_name})", style="yellow")
         status_bar.append("  │  ", style="dim grey42")
         status_bar.append("Ejecuta ", style="dim")
         status_bar.append("login", style="bold cyan")
         status_bar.append(f" para conectar tu cuenta de {short_name}", style="dim")
+    else:
+        status_bar.append("  ○ ", style="bold bright_cyan")
+        status_bar.append("Configuración inicial pendiente", style="bold bright_cyan")
+        status_bar.append("  │  ", style="dim grey42")
+        status_bar.append("Selecciona tu universidad para continuar", style="dim")
 
     console.print(status_bar)
     console.print()
@@ -671,24 +683,35 @@ def cmd_logout():
         console.print("[bold red]✖ Hubo un problema al intentar cerrar sesión.[/bold red]")
 
 
-def cmd_institution():
+def cmd_institution(is_first_time: bool = False):
     """Selector y configurador de universidad / Blackboard."""
-    current = get_active_institution()
     print_header()
 
-    console.print(Panel(
-        f"[bold white]Institución activa:[/bold white] [{current.get('color', 'white')}]{current.get('name')}[/{current.get('color', 'white')}]\n"
-        f"[dim white]Servidor:[/dim white] [dim]{current.get('base_url')}[/dim]\n\n"
-        f"[dim grey70]Cada universidad mantiene sus propias sesiones, credenciales y caché de descargas de forma aislada.[/dim grey70]",
-        title="[bold white] 🏫 Configuración de Universidad [/bold white]",
-        title_align="left",
-        border_style="grey37",
-        box=box.ROUNDED
-    ))
+    if is_first_time:
+        console.print(Panel(
+            "[bold white]¡Bienvenido a Blackboard CLI![/bold white]\n\n"
+            "[dim white]Para comenzar, por favor selecciona la universidad o instituto al que perteneces.[/dim white]\n"
+            "[dim grey70]Esta configuración se guardará automáticamente en tu equipo para tus próximas sesiones.[/dim grey70]",
+            title="[bold bright_cyan] 🎓 Configuración Inicial [/bold bright_cyan]",
+            title_align="left",
+            border_style="bright_cyan",
+            box=box.ROUNDED
+        ))
+    else:
+        current = get_active_institution()
+        console.print(Panel(
+            f"[bold white]Institución activa:[/bold white] [{current.get('color', 'white')}]{current.get('name')}[/{current.get('color', 'white')}]\n"
+            f"[dim white]Servidor:[/dim white] [dim]{current.get('base_url')}[/dim]\n\n"
+            f"[dim grey70]Cada universidad mantiene sus propias sesiones, credenciales y caché de descargas de forma aislada.[/dim grey70]",
+            title="[bold white] 🏫 Configuración de Universidad [/bold white]",
+            title_align="left",
+            border_style="grey37",
+            box=box.ROUNDED
+        ))
 
     table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
     table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-    table.add_column("Institución", style="bold white", width=38)
+    table.add_column("Institución", style="bold white", width=42)
     table.add_column("URL del Aula Virtual", style="dim grey70")
 
     table.add_row("[1]", "UPC (Univ. Peruana de Ciencias Aplicadas)", "aulavirtual.upc.edu.pe")
@@ -696,35 +719,40 @@ def cmd_institution():
     table.add_row("[3]", "UPN (Universidad Privada del Norte)", "upn.blackboard.com")
     table.add_row("[4]", "SENATI (Servicio Nac. Adiestramiento Ind.)", "senati.blackboard.com")
     table.add_row("[5]", "Personalizada (Cualquier Blackboard Ultra)", "Ingresar enlace manualmente")
-    table.add_row("", "", "")
-    table.add_row("[0]", "Cancelar / Mantener actual", "")
+
+    valid_choices = ["1", "2", "3", "4", "5"]
+    if not is_first_time:
+        table.add_row("", "", "")
+        table.add_row("[0]", "Cancelar / Mantener actual", "")
+        valid_choices.append("0")
 
     console.print(table)
     console.print()
 
-    choice = Prompt.ask("[bold bright_cyan]universidad[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=["1", "2", "3", "4", "5", "0"], default="0")
+    default_choice = "1" if is_first_time else "0"
+    prompt_label = "selecciona tu universidad" if is_first_time else "universidad"
+    choice = Prompt.ask(f"[bold bright_cyan]{prompt_label}[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=valid_choices, default=default_choice)
 
     if choice == "0":
         return
 
+    new_inst = None
     if choice == "1":
         new_inst = set_active_institution("upc")
-        console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
     elif choice == "2":
         new_inst = set_active_institution("ucv")
-        console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
     elif choice == "3":
         new_inst = set_active_institution("upn")
-        console.print(f"\n[bold green]✔ Universidad cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
     elif choice == "4":
         new_inst = set_active_institution("senati")
-        console.print(f"\n[bold green]✔ Institución cambiada a:[/bold green] [bold white]{new_inst['name']}[/bold white]")
     elif choice == "5":
         console.print("\n[dim]Ingresa la URL o dominio del aula virtual de tu universidad o instituto.[/dim]")
         console.print("[dim]Ejemplos: [cyan]senati.blackboard.com[/cyan], [cyan]ucv.blackboard.com[/cyan] o [cyan]https://miinstituto.blackboard.com[/cyan][/dim]\n")
         raw_url = Prompt.ask("[bold bright_cyan]URL de Blackboard[/bold bright_cyan]")
         if not raw_url.strip():
             console.print("[yellow]Operación cancelada: URL vacía.[/yellow]")
+            if is_first_time:
+                return cmd_institution(is_first_time=True)
             return
 
         with console.status("[bold cyan]Verificando compatibilidad con Blackboard Learn / Ultra...[/bold cyan]"):
@@ -734,22 +762,26 @@ def cmd_institution():
             console.print(f"[bold green]✔ Servidor compatible detectado:[/bold green] {desc}")
             custom_name = Prompt.ask("[bold bright_cyan]Nombre o sigla de la institución[/bold bright_cyan] (ej: SENATI, UDEP, PUCP)", default="")
             new_inst = set_active_institution("custom", custom_url=raw_url, custom_name=custom_name)
-            console.print(f"\n[bold green]✔ Institución configurada exitosamente:[/bold green] [bold white]{new_inst['name']}[/bold white] ({new_inst['base_url']})")
         else:
             console.print(f"[bold red]✖ No se pudo verificar la compatibilidad de la URL:[/bold red] {desc}")
             proceed = Confirm.ask("¿Deseas guardarla de todas maneras?", default=False)
             if proceed:
                 custom_name = Prompt.ask("[bold bright_cyan]Nombre o sigla de la institución[/bold bright_cyan]", default="")
                 new_inst = set_active_institution("custom", custom_url=raw_url, custom_name=custom_name)
-                console.print(f"\n[yellow]⚠ Configuración guardada:[/yellow] [bold white]{new_inst['name']}[/bold white] ({new_inst['base_url']})")
             else:
                 console.print("[dim]Operación cancelada sin cambios.[/dim]")
+                if is_first_time:
+                    return cmd_institution(is_first_time=True)
                 return
+
+    if new_inst:
+        prefix = "✔ Configuración inicial guardada:" if is_first_time else "✔ Institución configurada:"
+        console.print(f"\n[bold green]{prefix}[/bold green] [bold white]{new_inst['name']}[/bold white] [dim]({new_inst['base_url']})[/dim]")
 
     # Preguntar si desea iniciar sesión de inmediato si no hay cookies guardadas
     new_user = verify_session()
     if not new_user:
-        start_login = Confirm.ask("\n¿Deseas iniciar sesión ahora en esta institución?", default=True)
+        start_login = Confirm.ask(f"\n¿Deseas iniciar sesión ahora en {new_inst.get('short_name', 'esta institución')}?", default=True)
         if start_login:
             cmd_login()
             return
@@ -757,6 +789,9 @@ def cmd_institution():
 
 def interactive_menu():
     """Bucle principal del menú interactivo estilo Claude Code / Antigravity."""
+    if not is_institution_configured():
+        cmd_institution(is_first_time=True)
+
     while True:
         user = verify_session()
         print_header(user)
@@ -832,6 +867,10 @@ def interactive_menu():
 
 def main():
     try:
+        if not is_institution_configured():
+            if len(sys.argv) <= 1 or sys.argv[1].lower() not in ["institucion", "universidad", "university", "inst"]:
+                cmd_institution(is_first_time=True)
+
         if len(sys.argv) > 1:
             arg = sys.argv[1].lower()
             if arg == "login":

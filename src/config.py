@@ -130,6 +130,18 @@ def validate_blackboard_url(url: str, timeout: float = 6.0) -> tuple[bool, str]:
     return False, "El servidor no parece ser una instancia de Blackboard Learn / Ultra"
 
 
+def is_institution_configured() -> bool:
+    """Retorna True si el usuario ya ha seleccionado y guardado una institución en disco."""
+    if ACTIVE_INSTITUTION_FILE.exists():
+        try:
+            with open(ACTIVE_INSTITUTION_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return bool(data and isinstance(data, dict) and data.get("base_url"))
+        except Exception:
+            return False
+    return False
+
+
 def get_active_institution() -> dict:
     """Retorna la configuración de la institución actualmente seleccionada."""
     if ACTIVE_INSTITUTION_FILE.exists():
