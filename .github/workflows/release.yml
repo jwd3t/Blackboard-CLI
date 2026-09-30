@@ -27,16 +27,42 @@ jobs:
       - name: Obtener versión del proyecto
         id: get_version
         run: |
-          VERSION=$(python -c "from config import VERSION; print(VERSION)")
+          VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from config import VERSION; print(VERSION)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Crear Release y adjuntar ZIP
+      - name: Extraer notas del CHANGELOG.md
+        run: |
+          python - << 'EOF'
+          import re, sys
+          from pathlib import Path
+          sys.path.insert(0, "src")
+          from config import VERSION
+
+          changelog_file = Path("CHANGELOG.md")
+          notes = ""
+          if changelog_file.exists():
+              changelog = changelog_file.read_text(encoding="utf-8")
+              pattern = rf"##\s*\[{re.escape(VERSION)}\][^\n]*\n([\s\S]*?)(?=\n##\s*\[|\Z)"
+              match = re.search(pattern, changelog)
+              if match:
+                  notes = match.group(1).strip()
+
+          if not notes:
+              notes = f"Novedades y mejoras de Blackboard CLI v{VERSION}."
+
+          Path("RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
+          EOF
+
+      - name: Crear Release y adjuntar archivos
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
           name: Blackboard CLI v${{ steps.get_version.outputs.version }}
-          files: Blackboard-CLI-v*.zip
+          body_path: RELEASE_NOTES.md
+          files: |
+            Blackboard-CLI-v*.zip
+            CHANGELOG.md
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
