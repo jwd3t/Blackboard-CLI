@@ -1,5 +1,5 @@
 """
-Pruebas unitarias y de integración para la arquitectura Multi-Institución (v3.0.0).
+Pruebas unitarias y de integración para la arquitectura Multi-Institución (v2.3.0).
 Valida:
 1. Normalización de URLs.
 2. Cambio de institución (UPC, UCV, UPN y personalizada).
@@ -7,6 +7,8 @@ Valida:
 4. Retrocompatibilidad de sesiones v2.x.
 5. Inyección de dependencias en UltraClient y CourseNotebookOrganizer.
 6. Validación de URLs de Blackboard Learn / Ultra.
+7. Verificador de versiones y releases GitHub (v2.3.0).
+8. Confirmaciones unificadas en español (SpanishConfirm [s/n]).
 """
 import os
 import sys
@@ -30,6 +32,11 @@ from config import (
     get_downloads_cache_file,
     get_browser_session_dir,
     validate_blackboard_url,
+    parse_version_tuple,
+    check_for_updates,
+    VERSION,
+    RELEASES_URL,
+    UPDATE_CACHE_FILE,
     DEFAULT_INSTITUTIONS,
     ACTIVE_INSTITUTION_FILE,
     SESSION_DIR,
@@ -37,6 +44,7 @@ from config import (
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer
 from auth import extract_cookies_for_domain
+from cli import SpanishConfirm, InvalidResponse
 
 
 class TestMultiInstitution(unittest.TestCase):
@@ -235,6 +243,73 @@ class TestMultiInstitution(unittest.TestCase):
         set_active_institution("senati")
         self.assertTrue(is_institution_configured())
         self.assertEqual(get_active_institution()["id"], "senati")
+
+    def test_parse_version_tuple(self):
+        """Valida la conversión de strings de versión semver a tuplas numéricas."""
+        self.assertEqual(parse_version_tuple("2.3.0"), (2, 3, 0))
+        self.assertEqual(parse_version_tuple("v2.3.0"), (2, 3, 0))
+        self.assertEqual(parse_version_tuple("v2.10.4-beta"), (2, 10, 4))
+        self.assertTrue(parse_version_tuple("v2.3.1") > parse_version_tuple("v2.3.0"))
+        self.assertTrue(parse_version_tuple("v2.3.0") > parse_version_tuple("v2.2.0"))
+        self.assertTrue(parse_version_tuple("v3.0.0") > parse_version_tuple("v2.9.9"))
+
+    def test_check_for_updates(self):
+        """Valida la detección de nuevas versiones y el funcionamiento del archivo de caché."""
+        backup_cache = None
+        if UPDATE_CACHE_FILE.exists():
+            backup_cache = UPDATE_CACHE_FILE.read_text(encoding="utf-8")
+
+        try:
+            # 1. Simular caché reciente con versión superior
+            import time
+            UPDATE_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            fake_cache = {
+                "checked_at": time.time(),
+                "tag_name": "v2.4.0",
+                "html_url": "https://github.com/jwd3t/Blackboard-CLI/releases/tag/v2.4.0"
+            }
+            UPDATE_CACHE_FILE.write_text(json.dumps(fake_cache), encoding="utf-8")
+
+            res = check_for_updates("2.3.0", cache_ttl=3600)
+            self.assertIsNotNone(res)
+            self.assertTrue(res["has_update"])
+            self.assertEqual(res["latest_version"], "v2.4.0")
+            self.assertEqual(res["url"], "https://github.com/jwd3t/Blackboard-CLI/releases/tag/v2.4.0")
+
+            # 2. Si la versión actual ya es superior a la caché
+            res_up_to_date = check_for_updates("2.5.0", cache_ttl=3600)
+            self.assertIsNone(res_up_to_date)
+        finally:
+            if backup_cache is not None:
+                UPDATE_CACHE_FILE.write_text(backup_cache, encoding="utf-8")
+            elif UPDATE_CACHE_FILE.exists():
+                UPDATE_CACHE_FILE.unlink()
+
+    def test_spanish_confirm(self):
+        """Valida que SpanishConfirm procese entradas en español y renderice [s/n]."""
+        confirm = SpanishConfirm()
+        self.assertEqual(confirm.choices, ["s", "n"])
+
+        # Entradas afirmativas
+        self.assertTrue(confirm.process_response("s"))
+        self.assertTrue(confirm.process_response("si"))
+        self.assertTrue(confirm.process_response("sí"))
+        self.assertTrue(confirm.process_response("S"))
+        self.assertTrue(confirm.process_response("y"))
+        self.assertTrue(confirm.process_response("yes"))
+
+        # Entradas negativas
+        self.assertFalse(confirm.process_response("n"))
+        self.assertFalse(confirm.process_response("no"))
+        self.assertFalse(confirm.process_response("N"))
+
+        # Entrada inválida lanza InvalidResponse
+        with self.assertRaises(InvalidResponse):
+            confirm.process_response("tal vez")
+
+        # Render de defaults
+        self.assertEqual(confirm.render_default(True).plain, "(s)")
+        self.assertEqual(confirm.render_default(False).plain, "(n)")
 
 
 if __name__ == "__main__":

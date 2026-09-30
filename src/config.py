@@ -9,12 +9,17 @@ import urllib.parse
 from pathlib import Path
 
 # Versión del software
-VERSION = "3.0.0"
+VERSION = "2.3.0"
+
+# Repositorio y Actualizaciones
+RELEASES_URL = "https://github.com/jwd3t/Blackboard-CLI/releases/"
+API_LATEST_RELEASE = "https://api.github.com/repos/jwd3t/Blackboard-CLI/releases/latest"
 
 # Rutas de almacenamiento local (la raíz del proyecto es el padre de src/)
 BASE_DIR = Path(__file__).resolve().parent.parent
 SESSION_DIR = BASE_DIR / ".session_data"
 ACTIVE_INSTITUTION_FILE = SESSION_DIR / "active_institution.json"
+UPDATE_CACHE_FILE = SESSION_DIR / "update_check.json"
 OUTPUT_DIR = BASE_DIR / "cuadernos"
 
 # Instituciones preconfiguradas
@@ -128,6 +133,66 @@ def validate_blackboard_url(url: str, timeout: float = 6.0) -> tuple[bool, str]:
         return False, f"No se pudo conectar a la URL: {e}"
 
     return False, "El servidor no parece ser una instancia de Blackboard Learn / Ultra"
+
+
+def parse_version_tuple(v: str) -> tuple[int, ...]:
+    """Convierte un string de versión (ej. 'v2.3.0') en tupla numérica (2, 3, 0) para comparar."""
+    import re
+    nums = re.findall(r"\d+", v)
+    return tuple(int(x) for x in nums) if nums else (0,)
+
+
+def check_for_updates(current_version: str = VERSION, cache_ttl: int = 1800) -> dict | None:
+    """
+    Consulta GitHub Releases para verificar si hay una nueva versión disponible.
+    Utiliza caché local en .session_data/update_check.json para no saturar la API ni ralentizar la CLI.
+    Retorna dict con datos de la nueva versión o None si está al día.
+    """
+    import time
+    now = time.time()
+
+    # 1. Leer caché si existe y no ha expirado
+    if UPDATE_CACHE_FILE.exists():
+        try:
+            with open(UPDATE_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if now - data.get("checked_at", 0) < cache_ttl:
+                remote_tag = data.get("tag_name", "")
+                if parse_version_tuple(remote_tag) > parse_version_tuple(current_version):
+                    return {
+                        "latest_version": remote_tag,
+                        "url": data.get("html_url") or RELEASES_URL,
+                        "has_update": True
+                    }
+                return None
+        except Exception:
+            pass
+
+    # 2. Consultar endpoint oficial de GitHub Releases
+    try:
+        import httpx
+        r = httpx.get(
+            API_LATEST_RELEASE,
+            headers={"User-Agent": "Blackboard-CLI"},
+            timeout=2.0
+        )
+        if r.status_code == 200:
+            rel = r.json()
+            remote_tag = rel.get("tag_name", "")
+            html_url = rel.get("html_url", RELEASES_URL)
+            SESSION_DIR.mkdir(parents=True, exist_ok=True)
+            with open(UPDATE_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump({"checked_at": now, "tag_name": remote_tag, "html_url": html_url}, f)
+            if parse_version_tuple(remote_tag) > parse_version_tuple(current_version):
+                return {
+                    "latest_version": remote_tag,
+                    "url": html_url,
+                    "has_update": True
+                }
+    except Exception:
+        pass
+
+    return None
 
 
 def is_institution_configured() -> bool:

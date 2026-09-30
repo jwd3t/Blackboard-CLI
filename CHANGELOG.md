@@ -7,9 +7,19 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-## [3.0.0] - 2026-09-30
+## [2.3.0] - 2026-09-30
 
 ### ✨ Añadido
+- **Notificación y actualizador de versión integrado:**
+  - Consulta automática no bloqueante de lanzamientos en GitHub (`https://github.com/jwd3t/Blackboard-CLI/releases/`).
+  - Si existe una versión más reciente, se muestra un aviso destacado `[u] ✨ update` ubicado inmediatamente debajo de `[0] exit` en el menú interactivo y en la barra de subtítulo.
+  - El comando `update` (o presionar `u`) muestra los detalles de la nueva versión y abre automáticamente la página oficial de releases en el navegador predeterminado.
+  - Diagnóstico (`cmd_status`) enriquecido con el estado de la versión (`(Al día)` o `(¡Nueva versión disponible!)`).
+  - Caché local con TTL (`.session_data/update_check.json`) y timeout seguro (2s) para garantizar velocidad instantánea en la interfaz.
+- **Estandarización de confirmaciones en español (`s/n`):**
+  - Nueva clase `SpanishConfirm` para Rich que estandariza todas las preguntas de confirmación del programa en `[s/n] (s):` o `[s/n] (n):`.
+  - Acepta de forma natural y tolerante respuestas como `s`, `si`, `sí`, `y`, `yes`, `n`, `no`.
+  - Soluciona inconsistencias donde algunos menús o prompts solicitaban confirmar con `Y` y otros con `S`.
 - **Soporte Multi-Institución y Genérico:**
   - Soporte nativo preconfigurado para múltiples universidades e institutos: **UPC** (`aulavirtual.upc.edu.pe`), **UCV** (`ucv.blackboard.com`), **UPN** (`upn.blackboard.com`) y **SENATI** (`senati.blackboard.com`).
   - Detección de atajos y dominios de SENATI (`senati`, `senati.pe`, `aulavirtual.senati.edu.pe`).

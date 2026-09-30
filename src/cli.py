@@ -56,8 +56,26 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Prompt, InvalidResponse, Confirm as _RichConfirm
 from rich import box
+
+class SpanishConfirm(_RichConfirm):
+    """Confirmación interactiva estandarizada en español [s/n]."""
+    choices = ["s", "n"]
+    validate_error_message = "[prompt.invalid]Por favor ingresa 's' para sí o 'n' para no"
+
+    def render_default(self, default) -> Text:
+        return Text("(s)" if default else "(n)", style="prompt.default")
+
+    def process_response(self, value: str) -> bool:
+        val = value.strip().lower()
+        if val in ["s", "si", "sí", "y", "yes"]:
+            return True
+        elif val in ["n", "no"]:
+            return False
+        raise InvalidResponse(self.validate_error_message)
+
+Confirm = SpanishConfirm
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -73,10 +91,12 @@ from config import (
     BASE_URL,
     OUTPUT_DIR,
     VERSION,
+    RELEASES_URL,
     get_base_url,
     get_active_institution,
     set_active_institution,
     is_institution_configured,
+    check_for_updates,
     DEFAULT_INSTITUTIONS,
     validate_blackboard_url,
     normalize_url,
@@ -269,8 +289,7 @@ def check_auth_or_prompt():
     inst = get_active_institution()
     short_name = inst.get("short_name", "tu universidad")
     console.print(f"[yellow]⚠️  No se detectó una sesión activa en Blackboard Ultra ({short_name}).[/yellow]")
-    opt = Prompt.ask(f"   ¿Deseas iniciar sesión en {short_name} ahora mismo?", choices=["s", "n"], default="s")
-    if opt.lower() == "s":
+    if Confirm.ask(f"   ¿Deseas iniciar sesión en {short_name} ahora mismo?", default=True):
         cmd_login()
         return verify_session()
     return None
@@ -283,8 +302,7 @@ def cmd_login():
     if user:
         name = f"{user.get('name', {}).get('given', '')} {user.get('name', {}).get('family', '')}".strip()
         console.print(f"[bold green]✔ Sesión actualmente válida para:[/bold green] [bold white]{name}[/bold white]")
-        re_login = Prompt.ask("\n¿Deseas volver a autenticarte con otra cuenta?", choices=["s", "n"], default="n")
-        if re_login.lower() != "s":
+        if not Confirm.ask("\n¿Deseas volver a autenticarte con otra cuenta?", default=False):
             return
 
     success = interactive_login()
@@ -325,12 +343,24 @@ def cmd_status():
         table.add_row("Servidor", f"[dim]{base_url}[/dim]")
         table.add_row("Cuadernos", f"[dim]{OUTPUT_DIR}[/dim]")
 
+        update_info = check_for_updates()
+        if update_info and update_info.get("has_update"):
+            table.add_row("Versión CLI", f"v{VERSION} [bold bright_green](¡Nueva versión {update_info['latest_version']} disponible!)[/bold bright_green]")
+        else:
+            table.add_row("Versión CLI", f"v{VERSION} [dim green](Al día)[/dim green]")
+
         console.print(Panel(table, title="[bold white] Diagnóstico [/bold white]", title_align="left", border_style="grey37", box=box.ROUNDED))
     else:
         table.add_row("Estado", "[bold red]✖ Sesión inactiva o expirada[/bold red]")
         table.add_row("Institución activa", f"[{inst_color}]{inst.get('name', 'N/A')}[/{inst_color}]")
         table.add_row("Servidor", f"[dim]{base_url}[/dim]")
         table.add_row("Cuadernos", f"[dim]{OUTPUT_DIR}[/dim]")
+
+        update_info = check_for_updates()
+        if update_info and update_info.get("has_update"):
+            table.add_row("Versión CLI", f"v{VERSION} [bold bright_green](¡Nueva versión {update_info['latest_version']} disponible!)[/bold bright_green]")
+        else:
+            table.add_row("Versión CLI", f"v{VERSION} [dim green](Al día)[/dim green]")
 
         console.print(Panel(
             table,
@@ -684,6 +714,48 @@ def cmd_logout():
         console.print("[bold red]✖ Hubo un problema al intentar cerrar sesión.[/bold red]")
 
 
+def cmd_update(update_info: dict | None = None):
+    """Muestra información de la última versión y abre la página de Releases en el navegador."""
+    import webbrowser
+    print_header()
+    if update_info is None:
+        update_info = check_for_updates()
+
+    target_url = (update_info and update_info.get("url")) or RELEASES_URL
+    latest_v = (update_info and update_info.get("latest_version")) or f"v{VERSION}"
+    has_update = bool(update_info and update_info.get("has_update"))
+
+    if has_update:
+        panel_title = "[bold bright_green] 🚀 Nueva Versión Disponible [/bold bright_green]"
+        border_style = "bright_green"
+        status_msg = f"[bold green]¡Hay una nueva versión disponible ({latest_v})![/bold green]"
+    else:
+        panel_title = "[bold bright_cyan] ℹ️ Información de Versión [/bold bright_cyan]"
+        border_style = "grey37"
+        status_msg = f"[bold green]✔ Ya cuentas con la versión más reciente (v{VERSION}).[/bold green]"
+
+    console.print(Panel(
+        f"[bold white]Versión instalada:[/bold white] [bold cyan]v{VERSION}[/bold cyan]\n"
+        f"[bold white]Última versión en GitHub:[/bold white] [bold white]{latest_v}[/bold white]\n"
+        f"[bold white]Estado:[/bold white] {status_msg}\n\n"
+        f"[bold white]Enlace de Releases:[/bold white] [bright_cyan]{RELEASES_URL}[/bright_cyan]\n\n"
+        f"[dim grey70]Abriendo el enlace oficial de descargas en tu navegador web...[/dim grey70]",
+        title=panel_title,
+        title_align="left",
+        border_style=border_style,
+        box=box.ROUNDED
+    ))
+
+    console.print("\n[dim]Abriendo navegador...[/dim]")
+    try:
+        webbrowser.open(target_url)
+    except Exception as e:
+        console.print(f"[yellow]No se pudo abrir el navegador automáticamente: {e}[/yellow]")
+
+    console.print(f"[dim]Enlace directo:[/dim] [bold cyan]{target_url}[/bold cyan]")
+    timed_pause(3)
+
+
 def cmd_institution(is_first_time: bool = False):
     """Selector y configurador de universidad / Blackboard."""
     print_header()
@@ -821,11 +893,24 @@ def interactive_menu():
         menu_table.add_row("", "", "", "")
         menu_table.add_row("[0]", "❌", "exit", "Salir")
 
+        update_info = check_for_updates()
+        if update_info and update_info.get("has_update"):
+            latest_v = update_info.get("latest_version")
+            menu_table.add_row(
+                "[u]", "✨", "update",
+                f"[bold bright_green]¡Nueva versión {latest_v} disponible![/bold bright_green] [dim](Presiona 'u' para descargar)[/dim]"
+            )
+
+        if update_info and update_info.get("has_update"):
+            panel_subtitle = f"[bold bright_green]✨ ¡Nueva versión {update_info['latest_version']} disponible! Escribe 'u' o el comando deseado[/bold bright_green]"
+        else:
+            panel_subtitle = "[dim grey42] Escribe un número o el nombre del comando [/dim grey42]"
+
         console.print(Panel(
             menu_table,
             title="[bold white] Comandos [/bold white]",
             title_align="left",
-            subtitle=f"[dim grey42] Escribe un número o el nombre del comando [/dim grey42]",
+            subtitle=panel_subtitle,
             subtitle_align="left",
             border_style="grey37",
             box=box.ROUNDED,
@@ -853,6 +938,9 @@ def interactive_menu():
             cmd_notebook()
         elif choice in ["8", "institucion", "universidad", "university", "inst"]:
             cmd_institution()
+            continue
+        elif choice in ["u", "update", "actualizar", "version"]:
+            cmd_update(update_info)
             continue
         elif choice in ["0", "exit", "quit", "q"]:
             console.print()
@@ -890,9 +978,11 @@ def main():
                 cmd_notebook()
             elif arg in ["institucion", "universidad", "university", "inst"]:
                 cmd_institution()
+            elif arg in ["update", "actualizar", "version"]:
+                cmd_update()
             else:
                 console.print(f"[red]Comando desconocido: {arg}[/red]")
-                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion, update")
         else:
             interactive_menu()
     except KeyboardInterrupt:
