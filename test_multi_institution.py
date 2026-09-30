@@ -30,6 +30,7 @@ from config import (
 )
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer
+from auth import extract_cookies_for_domain
 
 
 class TestMultiInstitution(unittest.TestCase):
@@ -189,6 +190,33 @@ class TestMultiInstitution(unittest.TestCase):
         # 3. Servidor inexistente / inválido
         is_invalid, err_msg = validate_blackboard_url("https://esta-url-no-existe-12345.com", timeout=2.0)
         self.assertFalse(is_invalid)
+
+    def test_extract_cookies_for_domain(self):
+        """Verifica que las cookies del dominio exacto prevalezcan sobre dominios secundarios y se excluyan servicios externos."""
+        sample_cookies = [
+            {"name": "JSESSIONID", "value": "WRONG_JSESSION", "domain": "alt-5eed7aa3f3eed.blackboard.com"},
+            {"name": "JSESSIONID", "value": "CORRECT_JSESSION", "domain": "senati.blackboard.com"},
+            {"name": "BbRouter", "value": "ALT_ROUTER", "domain": "alt-5eed7aa3f3eed.blackboard.com"},
+            {"name": "BbRouter", "value": "MAIN_ROUTER", "domain": "senati.blackboard.com"},
+            {"name": "XSRF-TOKEN", "value": "TOKEN_123", "domain": "senati.blackboard.com"},
+            {"name": "_ga", "value": "GA_PARENT", "domain": ".blackboard.com"},
+            {"name": "ESTSAUTH", "value": "MS_SECRET", "domain": "login.microsoftonline.com"},
+            {"name": "SAML_COOKIE", "value": "SAML_SECRET", "domain": "senati.edu.pe"},
+        ]
+
+        extracted = extract_cookies_for_domain(sample_cookies, "https://senati.blackboard.com")
+
+        # Dominio exacto prevalece
+        self.assertEqual(extracted["BbRouter"], "MAIN_ROUTER")
+        self.assertEqual(extracted["JSESSIONID"], "CORRECT_JSESSION")
+        self.assertEqual(extracted["XSRF-TOKEN"], "TOKEN_123")
+
+        # Dominio comodín / padre permitido
+        self.assertEqual(extracted["_ga"], "GA_PARENT")
+
+        # Dominios externos ignorados para Blackboard
+        self.assertNotIn("ESTSAUTH", extracted)
+        self.assertNotIn("SAML_COOKIE", extracted)
 
 
 if __name__ == "__main__":

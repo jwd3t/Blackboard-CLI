@@ -29,44 +29,99 @@ from config import (
 )
 
 
-def get_stored_cookies(cookies_file: Path | None = None) -> dict[str, str] | None:
-    """Lee las cookies almacenadas en disco para la institución activa."""
+def extract_cookies_for_domain(cookies_list: list[dict], target_url: str) -> dict[str, str]:
+    """
+    Filtra y prioriza cookies para la URL de destino de Blackboard:
+    1. Acepta cookies de dominio padre (.blackboard.com).
+    2. Da máxima prioridad a cookies de dominio exacto (ej: senati.blackboard.com o aulavirtual.upc.edu.pe).
+    3. Descarta cookies de otros subdominios (ej: alt-*.blackboard.com) o servicios externos (Microsoft/Google).
+    """
+    domain = urllib.parse.urlparse(target_url).netloc.lower()
+    matched = {}
+
+    # 1. Cookies de dominio padre (.blackboard.com)
+    for c in cookies_list:
+        c_dom = c.get("domain", "").lstrip(".").lower()
+        if c_dom and domain.endswith(c_dom) and c_dom != domain:
+            matched[c["name"]] = c["value"]
+
+    # 2. Cookies de dominio exacto (ej: senati.blackboard.com) - sobrescriben con máxima prioridad
+    for c in cookies_list:
+        c_dom = c.get("domain", "").lstrip(".").lower()
+        if c_dom == domain:
+            matched[c["name"]] = c["value"]
+
+    # 3. Si no hubo coincidencia estricta (ej: IP o dominio local), incluir cookies sin dominio
+    if not matched:
+        for c in cookies_list:
+            if not c.get("domain"):
+                matched[c["name"]] = c["value"]
+
+    return matched
+
+
+def get_stored_cookies(cookies_file: Path | None = None, base_url: str | None = None) -> dict[str, str] | None:
+    """Lee y filtra las cookies almacenadas en disco para la institución activa."""
     target_file = cookies_file or get_cookies_file()
     if not target_file.exists():
         return None
+    target_base = base_url or get_base_url()
     try:
         with open(target_file, "r", encoding="utf-8") as f:
-            cookies_list = json.load(f)
-            return {c["name"]: c["value"] for c in cookies_list}
+            data = json.load(f)
+            if isinstance(data, list):
+                return extract_cookies_for_domain(data, target_base)
+            elif isinstance(data, dict):
+                return data
     except Exception:
         return None
+    return None
 
 
-def verify_session(cookies: dict[str, str] | None = None, base_url: str | None = None) -> dict | None:
+def verify_session(
+    cookies: dict[str, str] | None = None,
+    base_url: str | None = None,
+    debug: bool = False
+) -> dict | None:
     """
     Verifica si la sesión actual sigue siendo válida contra la API de Blackboard.
     Retorna los datos del usuario si es válida, o None si expiró.
     """
+    target_base = base_url or get_base_url()
     if cookies is None:
-        cookies = get_stored_cookies()
+        cookies = get_stored_cookies(base_url=target_base)
     if not cookies:
         return None
 
-    target_base = base_url or get_base_url()
     try:
         url = f"{target_base}/learn/api/public/v1/users/me"
         xsrf = cookies.get("XSRF-TOKEN", "")
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json",
-            "X-Blackboard-XSRF": xsrf,
-            "X-XSRF-TOKEN": xsrf,
+            "Referer": f"{target_base}/ultra",
         }
-        resp = httpx.get(url, cookies=cookies, headers=headers, timeout=10.0)
+        if xsrf:
+            headers["X-Blackboard-XSRF"] = xsrf
+            headers["X-XSRF-TOKEN"] = xsrf
+
+        resp = httpx.get(
+            url,
+            cookies=cookies,
+            headers=headers,
+            follow_redirects=True,
+            timeout=10.0
+        )
         if resp.status_code == 200:
-            return resp.json()
-    except Exception:
-        pass
+            try:
+                return resp.json()
+            except Exception:
+                pass
+        elif debug:
+            print(f"[debug] verify_session status: {resp.status_code}, body: {resp.text[:150]}")
+    except Exception as e:
+        if debug:
+            print(f"[debug] verify_session error: {e}")
     return None
 
 
@@ -187,12 +242,16 @@ def interactive_login(
 
         start_time = time.time()
         logged_in = False
+        user_info = None
 
         try:
             while time.time() - start_time < timeout_seconds:
                 # 1. Si el usuario presionó ENTER manualmente
                 if user_pressed_enter:
                     print("\n[i] Capturando sesión a solicitud del usuario...")
+                    raw_cookies = context.cookies()
+                    cookie_dict = extract_cookies_for_domain(raw_cookies, target_base)
+                    user_info = verify_session(cookie_dict, base_url=target_base)
                     logged_in = True
                     break
 
@@ -206,31 +265,46 @@ def interactive_login(
                     print("\n[!] Se cerró la ventana del navegador.")
                     break
 
-                # 3. Revisar las URLs de todas las pestañas abiertas
-                all_urls = [page_item.url for page_item in pages]
-                for u in all_urls:
-                    u_lower = u.lower()
-                    if (domain and domain in u_lower) or "blackboard" in u_lower or "aulavirtual" in u_lower or "senati" in u_lower:
-                        if any(path in u_lower for path in ["/ultra", "/webapps/portal", "/webapps/blackboard", "tab_tab_group_id"]):
-                            if "login" not in u_lower and "microsoft" not in u_lower and "auth" not in u_lower:
-                                logged_in = True
-                                print(f"\n[✓] ¡Inicio de sesión detectado en: {u}!")
-                                break
-                if logged_in:
-                    break
-
-                # 4. Validar activamente las cookies actuales contra la API de Blackboard
+                # 3. Validar activamente las cookies actuales contra la API de Blackboard
+                # Esta es la comprobación más confiable: sólo confirma si la API responde 200 OK con el usuario
                 try:
                     raw_cookies = context.cookies()
-                    cookie_dict = {c["name"]: c["value"] for c in raw_cookies}
+                    cookie_dict = extract_cookies_for_domain(raw_cookies, target_base)
                     if "BbRouter" in cookie_dict or "XSRF-TOKEN" in cookie_dict:
-                        user_data = verify_session(cookie_dict, base_url=target_base)
-                        if user_data:
+                        user_info = verify_session(cookie_dict, base_url=target_base)
+                        if user_info:
+                            user_name = (
+                                f"{user_info.get('name', {}).get('given', '')} {user_info.get('name', {}).get('family', '')}".strip()
+                                or user_info.get("userName")
+                                or "Estudiante"
+                            )
+                            print(f"\n[✓] ¡Sesión API validada exitosamente para {user_name}!")
                             logged_in = True
-                            print(f"\n[✓] ¡Sesión API validada para {user_data.get('userName')}!")
                             break
                 except Exception:
                     pass
+
+                # 4. Comprobar si el navegador ya llegó a una URL definitiva de Ultra (Cursos, Institución, etc.)
+                all_urls = [page_item.url for page_item in pages]
+                for u in all_urls:
+                    u_lower = u.lower()
+                    if (domain and domain in u_lower) or "blackboard" in u_lower or "senati" in u_lower or "aulavirtual" in u_lower:
+                        if any(path in u_lower for path in ["/ultra/course", "/ultra/institution-page", "/ultra/stream", "tab_tab_group_id"]):
+                            if "login" not in u_lower and "microsoft" not in u_lower and "auth" not in u_lower:
+                                raw_cookies = context.cookies()
+                                cookie_dict = extract_cookies_for_domain(raw_cookies, target_base)
+                                user_info = verify_session(cookie_dict, base_url=target_base)
+                                if user_info:
+                                    user_name = (
+                                        f"{user_info.get('name', {}).get('given', '')} {user_info.get('name', {}).get('family', '')}".strip()
+                                        or user_info.get("userName")
+                                        or "Estudiante"
+                                    )
+                                    print(f"\n[✓] ¡Inicio de sesión confirmado para {user_name} en: {u}!")
+                                    logged_in = True
+                                    break
+                if logged_in:
+                    break
 
                 time.sleep(1.5)
 

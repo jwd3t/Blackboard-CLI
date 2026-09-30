@@ -229,7 +229,12 @@ def cmd_login():
     if success:
         user = verify_session()
         print_header(user)
-        console.print("[bold green]✔ ¡Autenticación completada y tokens almacenados de forma segura![/bold green]")
+        if user:
+            name = f"{user.get('name', {}).get('given', '')} {user.get('name', {}).get('family', '')}".strip() or user.get("userName") or "Estudiante"
+            console.print(f"[bold green]✔ ¡Autenticación completada y tokens almacenados de forma segura para {name}![/bold green]")
+        else:
+            console.print("[yellow]⚠️ Se guardaron las cookies de sesión, pero el aula virtual aún no las reporta como activas.[/yellow]")
+            console.print("[dim]   (Prueba volver a iniciar sesión asegurándote de llegar hasta la lista de tus cursos).[/dim]")
     else:
         console.print("[bold red]✖ No se pudo completar el inicio de sesión.[/bold red]")
 

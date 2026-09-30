@@ -51,18 +51,20 @@ class UltraClient:
         base_url: str | None = None,
         cache_file: Path | None = None,
     ):
-        if cookies is None:
-            cookies = get_stored_cookies() or {}
-        self.cookies = cookies
         self.base_url = base_url or get_base_url()
         self.cache_file = cache_file or get_downloads_cache_file()
+        if cookies is None:
+            cookies = get_stored_cookies(base_url=self.base_url) or {}
+        self.cookies = cookies
         xsrf = self.cookies.get("XSRF-TOKEN", "")
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json",
-            "X-Blackboard-XSRF": xsrf,
-            "X-XSRF-TOKEN": xsrf,
+            "Referer": f"{self.base_url}/ultra",
         }
+        if xsrf:
+            self.headers["X-Blackboard-XSRF"] = xsrf
+            self.headers["X-XSRF-TOKEN"] = xsrf
         self.client = httpx.Client(
             base_url=self.base_url,
             cookies=self.cookies,
