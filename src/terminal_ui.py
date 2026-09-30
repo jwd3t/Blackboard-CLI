@@ -53,6 +53,30 @@ def get_random_tip() -> str:
     return random.choice(TIPS)
 
 
+def setup_terminal_window(min_cols: int = 120, min_lines: int = 40):
+    """
+    Asegura que la ventana de la consola tenga un tamaño adecuado (por defecto 120 columnas x 40 líneas)
+    para visualizar el banner completo y todas las opciones sin necesidad de scroll vertical.
+    """
+    if not hasattr(sys.stdin, "isatty") or not sys.stdin.isatty():
+        return
+    try:
+        import shutil
+        cols, lines = shutil.get_terminal_size((80, 24))
+        target_cols = max(cols, min_cols)
+        target_lines = max(lines, min_lines)
+
+        # Enviar secuencia de escape ANSI para emuladores modernos (Windows Terminal, iTerm2, macOS Terminal, Linux)
+        sys.stdout.write(f"\x1b[8;{target_lines};{target_cols}t")
+        sys.stdout.flush()
+
+        # En Windows conhost clásico, invocar mode con
+        if sys.platform == "win32":
+            os.system(f"mode con: cols={target_cols} lines={target_lines} >nul 2>&1")
+    except Exception:
+        pass
+
+
 def read_key_event() -> tuple[str, str]:
     """
     Lee un evento de teclado de forma interactiva.

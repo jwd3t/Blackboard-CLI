@@ -17,6 +17,7 @@ from terminal_ui import (
     read_key_event,
     hybrid_select,
     get_random_tip,
+    setup_terminal_window,
     _find_match_idx,
     _find_match_id,
     TIPS,
@@ -313,6 +314,29 @@ class TestTerminalUI(unittest.TestCase):
              patch("cli.verify_session", return_value=None):
             # No debe lanzar excepción
             cmd_institution()
+
+    def test_setup_terminal_window(self):
+        """Valida que setup_terminal_window gestione el redimensionamiento sin errores."""
+        # Modo no TTY
+        with patch("sys.stdin.isatty", return_value=False):
+            setup_terminal_window(120, 40)  # No debe hacer nada ni fallar
+
+        # Modo TTY en Windows
+        with patch("sys.stdin.isatty", return_value=True), \
+             patch("sys.platform", "win32"), \
+             patch("shutil.get_terminal_size", return_value=(80, 24)), \
+             patch("os.system") as mock_os:
+            setup_terminal_window(120, 40)
+            mock_os.assert_called_with("mode con: cols=120 lines=40 >nul 2>&1")
+
+        # Modo TTY en Unix
+        with patch("sys.stdin.isatty", return_value=True), \
+             patch("sys.platform", "linux"), \
+             patch("shutil.get_terminal_size", return_value=(80, 24)), \
+             patch("sys.stdout.write") as mock_write, \
+             patch("sys.stdout.flush"):
+            setup_terminal_window(120, 40)
+            mock_write.assert_called_with("\x1b[8;40;120t")
 
 
 if __name__ == "__main__":

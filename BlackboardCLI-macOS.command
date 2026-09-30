@@ -9,6 +9,9 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
+# Configurar tamaño de ventana por defecto (120 columnas x 40 líneas)
+printf '\e[8;40;120t' 2>/dev/null || true
+
 # 1. Buscar un intérprete de Python 3 adecuado
 PY_CMD=""
 

@@ -102,7 +102,7 @@ from config import (
     normalize_url,
     open_in_file_manager,
 )
-from terminal_ui import hybrid_select, get_random_tip
+from terminal_ui import hybrid_select, get_random_tip, setup_terminal_window
 from auth import verify_session, interactive_login, logout
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer, format_date, generate_gemini_notebook
@@ -984,6 +984,7 @@ def cmd_institution(is_first_time: bool = False):
 
 def interactive_menu():
     """Bucle principal del menú interactivo híbrido estilo Claude Code / Antigravity."""
+    setup_terminal_window(120, 40)
     if not is_institution_configured():
         cmd_institution(is_first_time=True)
 
@@ -1089,6 +1090,7 @@ def interactive_menu():
 
 def main():
     try:
+        setup_terminal_window(120, 40)
         if not is_institution_configured():
             if len(sys.argv) <= 1 or sys.argv[1].lower() not in ["8", "institucion", "universidad", "university", "inst"]:
                 cmd_institution(is_first_time=True)

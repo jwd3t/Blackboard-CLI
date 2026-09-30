@@ -1,6 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Configurar tamaño de ventana por defecto (120 columnas x 40 lineas) y titulo
+title Blackboard CLI - AI Study Notebook Sync
+mode con: cols=120 lines=40 >nul 2>&1
+
 set "PY_CMD="
 
 :: 1. Probar py -3
@@ -124,6 +128,7 @@ echo [v] Entorno virtual listo. Iniciando Blackboard CLI...
 echo.
 
 :execute_venv
+mode con: cols=120 lines=40 >nul 2>&1
 ".venv\Scripts\python.exe" src\cli.py %*
 
 :finish
