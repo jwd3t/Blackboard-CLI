@@ -177,12 +177,13 @@ def print_header(user: dict | None = None):
         inst_color = "bright_cyan"
         base_url = ""
 
-    # Tagline + version pill
+    # Tagline + versión (sin resaltado de fondo)
     tagline = Text(justify="center")
-    tagline.append(f"  Aula Virtual • {short_name}", style="dim white")
+    tagline.append(f"Aula Virtual • {short_name}", style="dim white")
     tagline.append("  •  ", style="dim grey50")
     tagline.append("Sincronizador de Cuadernos para IA", style="dim italic grey70")
-    tagline.append(f"  v{VERSION} ", style=f"bold black on {inst_color}")
+    tagline.append("  •  ", style="dim grey50")
+    tagline.append(f"v{VERSION}", style="bold cyan")
     console.print(tagline)
 
     # Línea separadora
