@@ -4,6 +4,8 @@ Compatible con Blackboard Learn Ultra de UPC, UCV, UPN y cualquier universidad.
 """
 from __future__ import annotations
 
+import os
+import sys
 import json
 import urllib.parse
 from pathlib import Path
@@ -298,6 +300,28 @@ def get_browser_session_dir() -> Path:
     inst = get_active_institution()
     inst_id = inst.get("id", "upc")
     return SESSION_DIR / f"browser_{inst_id}"
+
+
+def open_in_file_manager(path: Path) -> bool:
+    """Abre una ruta (carpeta o archivo) en el explorador de archivos nativo del sistema operativo."""
+    import subprocess
+    try:
+        path = path.resolve()
+        if path.is_file():
+            path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            path.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(str(path))
+            return True
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=True)
+            return True
+        else:
+            subprocess.run(["xdg-open", str(path)], check=True)
+            return True
+    except Exception:
+        return False
 
 
 # Inicialización de variables para compatibilidad directa

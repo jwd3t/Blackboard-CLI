@@ -23,9 +23,12 @@ No necesitas configurar entornos manualmente. El programa incluye gestores autom
 
 ---
 
-## 🖥️ Menú Interactivo
+## 🖥️ Control Híbrido y Menú Interactivo
 
-Al iniciar la aplicación, verás la consola interactiva con las siguientes opciones:
+La CLI cuenta con una experiencia de control híbrido moderna:
+* **Navegación instantánea:** Puedes desplazarte con las flechas `[▲/▼]` (con rotación cíclica suave) y presionar `Enter` para elegir.
+* **Barra de texto en tiempo real:** Simultáneamente, puedes escribir números o nombres de comando (`sync`, `o`, `2`, `exit`) con borrado `Backspace`, viendo en vivo cómo el selector salta a tu opción.
+* **Consejos didácticos:** Barra de tips en español al pie del menú para aprender atajos y flujos de estudio con IA.
 
 | Opción | Comando | Descripción |
 | :---: | :--- | :--- |
@@ -37,6 +40,10 @@ Al iniciar la aplicación, verás la consola interactiva con las siguientes opci
 | `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies de la institución activa. |
 | `[7]` | `notebook`| **Exportar a Gemini Notebook:** Genera una carpeta plana (`gemini_notebook/`) optimizada para NotebookLM. |
 | `[8]` | `institucion`| **Cambiar Institución:** Alterna entre UPC, UCV, UPN, SENATI o agrega cualquier URL de Blackboard Learn. |
+| **Accesos Rápidos** | | |
+| `[o]` | `abrir` | **Explorador:** Abre la carpeta raíz de `cuadernos/` en el explorador de archivos nativo. |
+| `[g]` | `gemini` | **Notas IA:** Abre la carpeta de cuadernos con tips para arrastrar a Google NotebookLM. |
+| `[w]` | `web` | **Aula Virtual Web:** Abre el Blackboard institucional activo directamente en tu navegador web. |
 | `[0]` | `exit` | Cierra la aplicación. |
 
 > 💡 **Tip de Navegación:** Dentro de los menús de sincronización puedes escribir **`v`** en cualquier momento para volver a la pantalla anterior sin cerrar el programa.

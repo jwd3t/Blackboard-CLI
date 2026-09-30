@@ -10,6 +10,18 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ## [2.3.0] - 2026-09-30
 
 ### ✨ Añadido
+- **Control Híbrido y Motor de UI Desacoplado (`src/terminal_ui.py`):**
+  - Navegación instantánea por teclado con flechas `[▲/▼]` con rotación cíclica suave (*wrap-around*) y selección con `Enter`.
+  - Buffer de texto simultáneo en tiempo real: teclea números o comandos (`sync`, `o`, `status`, etc.) con borrado `Backspace`, viendo cómo el cursor salta a la opción en vivo.
+  - Mecanismo de resiliencia con fallback automático en entornos no interactivos o pipes (`sys.stdin.isatty() == False`) recurriendo a `Prompt.ask()`.
+  - Barra de tips didácticos rotativos en español al pie de los menús para enseñar trucos del programa y flujos de estudio con IA.
+  - Experiencia unificada de `hybrid_select` en el Menú Principal, Selector de Cursos, Selector de Semanas, Selector de Universidad y Exportador a Gemini Notebook.
+- **Accesos Rápidos de Sistema (`[o]`, `[g]`, `[w]`):**
+  - `[o]` / `abrir`: Abre la carpeta de cuadernos en el Explorador de Windows o Finder de Mac mediante la nueva utilidad `open_in_file_manager` en `src/config.py`.
+  - `[g]` / `gemini`: Acceso rápido a las notas optimizadas para arrastrar a Google NotebookLM con tips interactivos.
+  - `[w]` / `web`: Abre directamente el aula virtual de la universidad activa en el navegador web habitual.
+- **Suite de Pruebas Unitarias de UI (`tests/test_terminal_ui.py`):**
+  - Cobertura completa de lectura de eventos de teclado, wrap-around de flechas, limpieza de buffer, edición por backspace, fallback TTY y apertura en gestor de archivos.
 - **Notificación y actualizador de versión integrado:**
   - Consulta automática no bloqueante de lanzamientos en GitHub (`https://github.com/jwd3t/Blackboard-CLI/releases/`).
   - Si existe una versión más reciente, se muestra un aviso destacado `[u] ✨ update` ubicado inmediatamente debajo de `[0] exit` en el menú interactivo y en la barra de subtítulo.

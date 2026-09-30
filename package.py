@@ -22,6 +22,7 @@ ZIP_NAME = BASE_DIR / f"Blackboard-CLI-v{VERSION}.zip"
 # Archivos base del proyecto
 FILES_TO_INCLUDE = [
     "src/cli.py",
+    "src/terminal_ui.py",
     "src/ultra_client.py",
     "src/organizer.py",
     "src/auth.py",

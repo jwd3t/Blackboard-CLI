@@ -100,7 +100,9 @@ from config import (
     DEFAULT_INSTITUTIONS,
     validate_blackboard_url,
     normalize_url,
+    open_in_file_manager,
 )
+from terminal_ui import hybrid_select, get_random_tip
 from auth import verify_session, interactive_login, logout
 from ultra_client import UltraClient
 from organizer import CourseNotebookOrganizer, format_date, generate_gemini_notebook
@@ -575,34 +577,55 @@ def cmd_notebook():
     if not dirs:
         console.print("[yellow]No se encontraron cursos descargados en la carpeta cuadernos.[/yellow]")
         return
-        
-    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
-    table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-    table.add_column("Curso Local", style="bold white")
-    table.add_row("[0]", "⚡ Exportar [bold]TODOS[/bold] los cursos locales")
-    table.add_row("[v]", "↩ Volver al menú principal")
-    table.add_row("", "")
-    
+
+    options = [
+        {"id": "0", "key_label": "[0]", "icon": "⚡", "command": "todos", "desc": "Exportar TODOS los cursos locales", "aliases": ["0", "todos", "all"]},
+        {"id": "v", "key_label": "[v]", "icon": "↩", "command": "volver", "desc": "Volver al menú principal", "aliases": ["v", "volver", "back"]},
+        {"is_separator": True, "title": ""},
+    ]
+
     for i, d in enumerate(dirs, 1):
-        table.add_row(f"[{i}]", f"📂 {d.name}")
-        
-    console.print(Panel(
-        table,
-        title="[bold white] Exportar a Gemini Notebook [/bold white]",
-        border_style="grey37",
-        box=box.ROUNDED
-    ))
-    
-    valid_choices = [str(i) for i in range(len(dirs) + 1)] + ["v"]
-    choice = Prompt.ask("\n[bold bright_cyan]notebook[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=valid_choices)
-    
-    if choice == "v":
-        return
-    elif choice == "0":
+        options.append({
+            "id": str(i),
+            "key_label": f"[{i}]",
+            "icon": "📂",
+            "command": d.name,
+            "desc": "",
+            "aliases": [str(i), d.name.lower()]
+        })
+
+    choice = hybrid_select(
+        options=options,
+        title="Exportar a Gemini Notebook",
+        header_func=print_header,
+        tip_text="Arrastra la carpeta 'gemini_notebook' a NotebookLM para crear podcasts de estudio.",
+        default_idx=0
+    )
+
+    if choice in ["v", "volver", "back"]:
+        return False
+    elif choice in ["0", "todos", "all"]:
         for d in dirs:
             _export_course_to_gemini(d)
+        return True
     else:
-        _export_course_to_gemini(dirs[int(choice) - 1])
+        target_dir = None
+        try:
+            d_idx = int(choice) - 1
+            if 0 <= d_idx < len(dirs):
+                target_dir = dirs[d_idx]
+        except ValueError:
+            for d in dirs:
+                if choice.lower() in d.name.lower():
+                    target_dir = d
+                    break
+
+        if target_dir:
+            _export_course_to_gemini(target_dir)
+            return True
+        else:
+            console.print("[red]Opción inválida.[/red]")
+            return False
 
 
 def cmd_sync():
@@ -623,39 +646,57 @@ def cmd_sync():
         return
 
     # 1. Menú de selección de curso
-    course_table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
-    course_table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-    course_table.add_column("Curso", style="bold white")
-
-    course_table.add_row("[0]", "⚡ Sincronizar [bold]TODOS[/bold] los cursos del semestre")
-    course_table.add_row("[v]", "↩ Volver al menú principal")
-    course_table.add_row("", "")
+    course_options = [
+        {"id": "0", "key_label": "[0]", "icon": "⚡", "command": "todos", "desc": "Sincronizar TODOS los cursos del semestre", "aliases": ["0", "todos", "all"]},
+        {"id": "v", "key_label": "[v]", "icon": "↩", "command": "volver", "desc": "Volver al menú principal", "aliases": ["v", "volver", "back"]},
+        {"is_separator": True, "title": ""},
+    ]
     for i, c in enumerate(courses, 1):
         clean_name = c["name"].replace(" - Virtual", "").replace(" - Presencial", "")
-        course_table.add_row(f"[{i}]", f"📚 {clean_name} [dim grey50]({c.get('course_id')})[/dim grey50]")
+        cid = c.get("course_id", "")
+        course_options.append({
+            "id": str(i),
+            "key_label": f"[{i}]",
+            "icon": "📚",
+            "command": clean_name,
+            "desc": f"({cid})" if cid else "",
+            "aliases": [str(i), clean_name.lower(), cid.lower()]
+        })
 
-    console.print(Panel(
-        course_table,
-        title="[bold white] Seleccionar Curso [/bold white]",
-        title_align="left",
-        subtitle="[dim grey42] Escribe el número del curso o 'v' para retroceder [/dim grey42]",
-        subtitle_align="left",
-        border_style="grey37",
-        box=box.ROUNDED
-    ))
+    c_choice = hybrid_select(
+        options=course_options,
+        title="Seleccionar Curso",
+        header_func=lambda: print_header(user),
+        tip_text="Escribe el número del curso o 'v' para retroceder.",
+        default_idx=0
+    )
 
-    valid_choices = [str(i) for i in range(len(courses) + 1)] + ["v"]
-    c_choice = Prompt.ask("\n[bold bright_cyan]sync[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=valid_choices)
+    if c_choice in ["v", "volver", "back"]:
+        return False
 
-    if c_choice == "v":
-        return
-
-    if c_choice == "0":
+    if c_choice in ["0", "todos", "all"]:
         _run_sync_all(organizer, courses)
-        return
+        return True
+
+    try:
+        c_idx = int(c_choice) - 1
+        if 0 <= c_idx < len(courses):
+            selected_course = courses[c_idx]
+        else:
+            console.print("[red]Opción de curso inválida.[/red]")
+            return False
+    except ValueError:
+        # Check alias
+        selected_course = None
+        for i, c in enumerate(courses, 1):
+            if c_choice == str(i) or c_choice in c["name"].lower() or c_choice == c.get("course_id", "").lower():
+                selected_course = c
+                break
+        if not selected_course:
+            console.print("[red]Opción de curso inválida.[/red]")
+            return False
 
     # 2. El usuario seleccionó un curso específico
-    selected_course = courses[int(c_choice) - 1]
     course_clean_name = selected_course["name"].replace(" - Virtual", "").replace(" - Presencial", "")
 
     with console.status(f"[bold cyan]Explorando unidades y semanas de {course_clean_name}...[/bold cyan]"):
@@ -664,44 +705,58 @@ def cmd_sync():
     if not sections:
         console.print("[yellow]  ⚠ No se encontraron unidades/semanas individuales. Sincronizando curso completo...[/yellow]")
         _run_sync_single_course(organizer, selected_course, target_section=None)
-        return
+        return True
 
     # Menú de unidades / semanas
-    section_table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
-    section_table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-    section_table.add_column("Unidad / Semana", style="bold white")
-
-    section_table.add_row("[0]", "📁 Sincronizar [bold]TODO[/bold] el curso (todas las semanas)")
-    section_table.add_row("[v]", "↩ Volver atrás")
-    section_table.add_row("", "")
+    section_options = [
+        {"id": "0", "key_label": "[0]", "icon": "📁", "command": "todo", "desc": "Sincronizar TODO el curso (todas las semanas)", "aliases": ["0", "todo", "all"]},
+        {"id": "v", "key_label": "[v]", "icon": "↩", "command": "volver", "desc": "Volver atrás", "aliases": ["v", "volver", "back"]},
+        {"is_separator": True, "title": ""},
+    ]
     for i, s in enumerate(sections, 1):
         is_sub = s.get("level", 0) > 0
-        style = "dim white" if is_sub else "bold white"
-        prefix = "   ↳ " if is_sub else "📂 "
-        section_table.add_row(f"[{i}]", f"{prefix}{s['title']}", style=style)
+        prefix = "↳" if is_sub else "📂"
+        section_options.append({
+            "id": str(i),
+            "key_label": f"[{i}]",
+            "icon": prefix,
+            "command": s["title"],
+            "desc": "",
+            "aliases": [str(i), s["title"].lower()]
+        })
 
-    console.print()
-    console.print(Panel(
-        section_table,
-        title=f"[bold white] {course_clean_name} [/bold white]",
-        title_align="left",
-        subtitle="[dim grey42] Escribe el número de la sección o 'v' para retroceder [/dim grey42]",
-        subtitle_align="left",
-        border_style="grey37",
-        box=box.ROUNDED
-    ))
+    s_choice = hybrid_select(
+        options=section_options,
+        title=course_clean_name,
+        header_func=lambda: print_header(user),
+        tip_text="Escribe el número de la sección o 'v' para retroceder.",
+        default_idx=0
+    )
 
-    sec_choices = [str(i) for i in range(len(sections) + 1)] + ["v"]
-    s_choice = Prompt.ask("\n[bold bright_cyan]sección[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=sec_choices)
-
-    if s_choice == "v":
+    if s_choice in ["v", "volver", "back"]:
         return cmd_sync()  # Vuelve al menú anterior recursivamente
 
-    if s_choice == "0":
+    if s_choice in ["0", "todo", "all"]:
         _run_sync_single_course(organizer, selected_course, target_section=None)
+        return True
     else:
-        chosen_section = sections[int(s_choice) - 1]
-        _run_sync_single_course(organizer, selected_course, target_section=chosen_section)
+        chosen_section = None
+        try:
+            sec_idx = int(s_choice) - 1
+            if 0 <= sec_idx < len(sections):
+                chosen_section = sections[sec_idx]
+        except ValueError:
+            for s in sections:
+                if s_choice.lower() in s.get("title", "").lower():
+                    chosen_section = s
+                    break
+
+        if chosen_section:
+            _run_sync_single_course(organizer, selected_course, target_section=chosen_section)
+            return True
+        else:
+            console.print("[red]Sección inválida.[/red]")
+            return False
 
 
 def cmd_logout():
@@ -756,69 +811,131 @@ def cmd_update(update_info: dict | None = None):
     timed_pause(3)
 
 
+def cmd_open_cuadernos():
+    """Abre la carpeta raíz de cuadernos en el explorador de archivos nativo."""
+    print_header()
+    console.print(Panel(
+        f"[bold white]Abriendo carpeta de cuadernos:[/bold white]\n"
+        f"[bright_cyan]{OUTPUT_DIR}[/bright_cyan]\n\n"
+        f"[dim grey70]Se abrirá la ventana del explorador de archivos en tu sistema operativo...[/dim grey70]",
+        title="[bold bright_cyan] 📁 Explorador de Cuadernos [/bold bright_cyan]",
+        title_align="left",
+        border_style="bright_cyan",
+        box=box.ROUNDED
+    ))
+    ok = open_in_file_manager(OUTPUT_DIR)
+    if ok:
+        console.print("[bold green]✔ Carpeta abierta en el explorador de archivos.[/bold green]")
+    else:
+        console.print(f"[yellow]⚠️ No se pudo abrir automáticamente. Puedes acceder manualmente en: {OUTPUT_DIR}[/yellow]")
+    timed_pause(2)
+
+
+def cmd_open_gemini():
+    """Abre la carpeta de cuadernos con instrucciones para Gemini Notebook / NotebookLM."""
+    print_header()
+    console.print(Panel(
+        f"[bold white]Carpeta de Cuadernos para IA:[/bold white]\n"
+        f"[bright_cyan]{OUTPUT_DIR}[/bright_cyan]\n\n"
+        f"[bold bright_green]💡 Tip Pro para Estudiar con NotebookLM:[/bold bright_green]\n"
+        f"[white]1. Entra a la carpeta de tu curso y luego a [bold cyan]gemini_notebook/[/bold cyan].[/white]\n"
+        f"[white]2. Arrastra los archivos [bold].md[/bold] o [bold].pdf[/bold] directamente a [bold cyan]NotebookLM[/bold cyan] (https://notebooklm.google.com).[/white]\n"
+        f"[white]3. ¡Genera podcasts de audio, resúmenes automáticos y guías de estudio interactivas![/white]",
+        title="[bold bright_magenta] 🤖 Gemini Notebook & NotebookLM [/bold bright_magenta]",
+        title_align="left",
+        border_style="bright_magenta",
+        box=box.ROUNDED
+    ))
+    open_in_file_manager(OUTPUT_DIR)
+    timed_pause(3)
+
+
+def cmd_open_web():
+    """Abre el aula virtual activa en el navegador web habitual."""
+    import webbrowser
+    print_header()
+    base_url = get_base_url()
+    inst = get_active_institution()
+    inst_name = inst.get("name", "Blackboard Learn")
+    console.print(Panel(
+        f"[bold white]Institución:[/bold white] [bold cyan]{inst_name}[/bold cyan]\n"
+        f"[bold white]Aula Virtual:[/bold white] [bright_cyan]{base_url}[/bright_cyan]\n\n"
+        f"[dim grey70]Abriendo el portal web en tu navegador habitual...[/dim grey70]",
+        title="[bold bright_cyan] 🌐 Blackboard Web [/bold bright_cyan]",
+        title_align="left",
+        border_style="bright_cyan",
+        box=box.ROUNDED
+    ))
+    try:
+        webbrowser.open(base_url)
+        console.print("[bold green]✔ Navegador web abierto.[/bold green]")
+    except Exception as e:
+        console.print(f"[yellow]⚠️ No se pudo abrir automáticamente el navegador: {e}[/yellow]")
+    timed_pause(2)
+
+
 def cmd_institution(is_first_time: bool = False):
     """Selector y configurador de universidad / Blackboard."""
-    print_header()
-
-    if is_first_time:
-        console.print(Panel(
-            "[bold white]¡Bienvenido a Blackboard CLI![/bold white]\n\n"
-            "[dim white]Para comenzar, por favor selecciona la universidad o instituto al que perteneces.[/dim white]\n"
-            "[dim grey70]Esta configuración se guardará automáticamente en tu equipo para tus próximas sesiones.[/dim grey70]",
-            title="[bold bright_cyan] 🎓 Configuración Inicial [/bold bright_cyan]",
-            title_align="left",
-            border_style="bright_cyan",
-            box=box.ROUNDED
-        ))
-    else:
-        current = get_active_institution()
-        console.print(Panel(
-            f"[bold white]Institución activa:[/bold white] [{current.get('color', 'white')}]{current.get('name')}[/{current.get('color', 'white')}]\n"
-            f"[dim white]Servidor:[/dim white] [dim]{current.get('base_url')}[/dim]\n\n"
-            f"[dim grey70]Cada universidad mantiene sus propias sesiones, credenciales y caché de descargas de forma aislada.[/dim grey70]",
-            title="[bold white] 🏫 Configuración de Universidad [/bold white]",
-            title_align="left",
-            border_style="grey37",
-            box=box.ROUNDED
-        ))
-
-    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1), show_edge=False)
-    table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-    table.add_column("Institución", style="bold white", no_wrap=True)
-    table.add_column("URL del Aula Virtual", style="dim grey70", no_wrap=True)
-
-    table.add_row("[1]", "UPC (Univ. Peruana de Ciencias Aplicadas)", "aulavirtual.upc.edu.pe")
-    table.add_row("[2]", "UCV (Universidad César Vallejo)", "ucv.blackboard.com")
-    table.add_row("[3]", "UPN (Universidad Privada del Norte)", "upn.blackboard.com")
-    table.add_row("[4]", "SENATI", "senati.blackboard.com")
-    table.add_row("[5]", "Personalizada (Cualquier Blackboard Ultra)", "Ingresar enlace manualmente")
-
-    valid_choices = ["1", "2", "3", "4", "5"]
+    options = [
+        {"id": "1", "key_label": "[1]", "icon": "🏫", "command": "UPC", "desc": "Universidad Peruana de Ciencias Aplicadas (aulavirtual.upc.edu.pe)", "aliases": ["1", "upc"]},
+        {"id": "2", "key_label": "[2]", "icon": "🏫", "command": "UCV", "desc": "Universidad César Vallejo (ucv.blackboard.com)", "aliases": ["2", "ucv"]},
+        {"id": "3", "key_label": "[3]", "icon": "🏫", "command": "UPN", "desc": "Universidad Privada del Norte (upn.blackboard.com)", "aliases": ["3", "upn"]},
+        {"id": "4", "key_label": "[4]", "icon": "🏫", "command": "SENATI", "desc": "Servicio Nacional de Adiestramiento en Trabajo Industrial (senati.blackboard.com)", "aliases": ["4", "senati"]},
+        {"id": "5", "key_label": "[5]", "icon": "🌐", "command": "Personalizada", "desc": "Cualquier Blackboard Ultra (Ingresar URL manualmente)", "aliases": ["5", "personalizada", "custom"]},
+    ]
     if not is_first_time:
-        table.add_row("", "", "")
-        table.add_row("[0]", "Cancelar / Mantener actual", "")
-        valid_choices.append("0")
+        options.append({"is_separator": True, "title": ""})
+        options.append({"id": "0", "key_label": "[0]", "icon": "↩", "command": "cancelar", "desc": "Cancelar / Mantener actual", "aliases": ["0", "cancelar", "cancel"]})
 
-    console.print(table)
-    console.print()
+    title = "Configuración Inicial" if is_first_time else "Configuración de Universidad"
+    tip = "Usa las flechas [▲/▼] o escribe el número o nombre de tu institución."
 
-    default_choice = "1" if is_first_time else "0"
-    prompt_label = "selecciona tu universidad" if is_first_time else "universidad"
-    choice = Prompt.ask(f"[bold bright_cyan]{prompt_label}[/bold bright_cyan] [dim grey50]❯[/dim grey50]", choices=valid_choices, default=default_choice)
+    def _inst_header():
+        print_header()
+        if is_first_time:
+            console.print(Panel(
+                "[bold white]¡Bienvenido a Blackboard CLI![/bold white]\n\n"
+                "[dim white]Para comenzar, por favor selecciona la universidad o instituto al que perteneces.[/dim white]\n"
+                "[dim grey70]Esta configuración se guardará automáticamente en tu equipo para tus próximas sesiones.[/dim grey70]",
+                title="[bold bright_cyan] 🎓 Configuración Inicial [/bold bright_cyan]",
+                title_align="left",
+                border_style="bright_cyan",
+                box=box.ROUNDED
+            ))
+        else:
+            current = get_active_institution()
+            console.print(Panel(
+                f"[bold white]Institución activa:[/bold white] [{current.get('color', 'white')}]{current.get('name')}[/{current.get('color', 'white')}]\n"
+                f"[dim white]Servidor:[/dim white] [dim]{current.get('base_url')}[/dim]\n\n"
+                f"[dim grey70]Cada universidad mantiene sus propias sesiones, credenciales y caché de descargas de forma aislada.[/dim grey70]",
+                title="[bold white] 🏫 Configuración de Universidad [/bold white]",
+                title_align="left",
+                border_style="grey37",
+                box=box.ROUNDED
+            ))
 
-    if choice == "0":
+    default_pos = 0 if is_first_time else (len(options) - 1)
+    choice = hybrid_select(
+        options=options,
+        title=title,
+        header_func=_inst_header,
+        tip_text=tip,
+        default_idx=default_pos
+    )
+
+    if choice in ["0", "cancelar", "cancel"]:
         return
 
     new_inst = None
-    if choice == "1":
+    if choice in ["1", "upc"]:
         new_inst = set_active_institution("upc")
-    elif choice == "2":
+    elif choice in ["2", "ucv"]:
         new_inst = set_active_institution("ucv")
-    elif choice == "3":
+    elif choice in ["3", "upn"]:
         new_inst = set_active_institution("upn")
-    elif choice == "4":
+    elif choice in ["4", "senati"]:
         new_inst = set_active_institution("senati")
-    elif choice == "5":
+    elif choice in ["5", "personalizada", "custom"]:
         console.print("\n[dim]Ingresa la URL o dominio del aula virtual de tu universidad o instituto.[/dim]")
         console.print("[dim]Ejemplos: [cyan]senati.blackboard.com[/cyan], [cyan]ucv.blackboard.com[/cyan] o [cyan]https://miinstituto.blackboard.com[/cyan][/dim]\n")
         raw_url = Prompt.ask("[bold bright_cyan]URL de Blackboard[/bold bright_cyan]")
@@ -846,83 +963,84 @@ def cmd_institution(is_first_time: bool = False):
                 if is_first_time:
                     return cmd_institution(is_first_time=True)
                 return
+    else:
+        console.print(f"[red]Opción no reconocida: {choice}[/red]")
+        if is_first_time:
+            return cmd_institution(is_first_time=True)
+        return
 
     if new_inst:
         prefix = "✔ Configuración inicial guardada:" if is_first_time else "✔ Institución configurada:"
         console.print(f"\n[bold green]{prefix}[/bold green] [bold white]{new_inst['name']}[/bold white] [dim]({new_inst['base_url']})[/dim]")
 
-    # Preguntar si desea iniciar sesión de inmediato si no hay cookies guardadas
-    new_user = verify_session()
-    if not new_user:
-        start_login = Confirm.ask(f"\n¿Deseas iniciar sesión ahora en {new_inst.get('short_name', 'esta institución')}?", default=True)
-        if start_login:
-            cmd_login()
-            return
+        # Preguntar si desea iniciar sesión de inmediato si no hay cookies guardadas
+        new_user = verify_session()
+        if not new_user:
+            start_login = Confirm.ask(f"\n¿Deseas iniciar sesión ahora en {new_inst.get('short_name', 'esta institución')}?", default=True)
+            if start_login:
+                cmd_login()
+                return
 
 
 def interactive_menu():
-    """Bucle principal del menú interactivo estilo Claude Code / Antigravity."""
+    """Bucle principal del menú interactivo híbrido estilo Claude Code / Antigravity."""
     if not is_institution_configured():
         cmd_institution(is_first_time=True)
 
     while True:
         user = verify_session()
-        print_header(user)
-
-        width = _get_terminal_width()
-
-        menu_table = Table(
-            box=box.SIMPLE,
-            show_header=False,
-            padding=(0, 1),
-            show_edge=False,
-        )
-        menu_table.add_column("Key", style="bold bright_cyan", width=5, justify="right")
-        menu_table.add_column("Icon", width=3)
-        menu_table.add_column("Comando", style="bold white", width=12)
-        menu_table.add_column("Descripción", style="dim grey70")
-
-        menu_table.add_row("[1]", "⚡", "sync", "Sincronizar aula virtual y actualizar cuadernos")
-        menu_table.add_row("[2]", "📅", "agenda", "Radar de exámenes, entregas y fechas clave")
-        menu_table.add_row("[3]", "📚", "cursos", "Explorar asignaturas matriculadas")
-        menu_table.add_row("[4]", "🔍", "status", "Diagnóstico de conexión y sesión")
-        menu_table.add_row("[5]", "🔐", "login", "Autenticar cuenta o iniciar sesión")
-        menu_table.add_row("[6]", "🚪", "logout", "Cerrar sesión y borrar credenciales")
-        menu_table.add_row("[7]", "🤖", "notebook", "Exportar a Gemini Notebook")
-        menu_table.add_row("[8]", "🏫", "institucion", "Cambiar universidad o instituto (UPC, UCV, SENATI...)")
-        menu_table.add_row("", "", "", "")
-        menu_table.add_row("[0]", "❌", "exit", "Salir")
-
         update_info = check_for_updates()
+
+        options = [
+            {"id": "1", "key_label": "[1]", "icon": "⚡", "command": "sync", "desc": "Sincronizar aula virtual y actualizar cuadernos", "aliases": ["1", "sync"]},
+            {"id": "2", "key_label": "[2]", "icon": "📅", "command": "agenda", "desc": "Radar de exámenes, entregas y fechas clave", "aliases": ["2", "agenda", "calendar"]},
+            {"id": "3", "key_label": "[3]", "icon": "📚", "command": "cursos", "desc": "Explorar asignaturas matriculadas", "aliases": ["3", "cursos", "courses"]},
+            {"id": "4", "key_label": "[4]", "icon": "🔍", "command": "status", "desc": "Diagnóstico de conexión y sesión", "aliases": ["4", "status"]},
+            {"id": "5", "key_label": "[5]", "icon": "🔐", "command": "login", "desc": "Autenticar cuenta o iniciar sesión", "aliases": ["5", "login"]},
+            {"id": "6", "key_label": "[6]", "icon": "🚪", "command": "logout", "desc": "Cerrar sesión y borrar credenciales", "aliases": ["6", "logout"]},
+            {"id": "7", "key_label": "[7]", "icon": "🤖", "command": "notebook", "desc": "Exportar a Gemini Notebook", "aliases": ["7", "notebook", "export"]},
+            {"id": "8", "key_label": "[8]", "icon": "🏫", "command": "institucion", "desc": "Cambiar universidad o instituto", "aliases": ["8", "institucion", "universidad", "university", "inst"]},
+            {"is_separator": True, "title": "Accesos Rápidos"},
+            {"id": "o", "key_label": "[o]", "icon": "📁", "command": "abrir", "desc": "Abrir carpeta de cuadernos en el explorador", "aliases": ["o", "abrir", "open"]},
+            {"id": "g", "key_label": "[g]", "icon": "📂", "command": "gemini", "desc": "Abrir carpeta de notas de Gemini Notebook", "aliases": ["g", "gemini", "notebooklm"]},
+            {"id": "w", "key_label": "[w]", "icon": "🌐", "command": "web", "desc": "Abrir aula virtual en el navegador web", "aliases": ["w", "web", "aula"]},
+        ]
+
         if update_info and update_info.get("has_update"):
             latest_v = update_info.get("latest_version")
-            menu_table.add_row(
-                "[u]", "✨", "update",
-                f"[bold bright_green]¡Nueva versión {latest_v} disponible![/bold bright_green] [dim](Presiona 'u' para descargar)[/dim]"
-            )
+            options.append({
+                "id": "u",
+                "key_label": "[u]",
+                "icon": "✨",
+                "command": "update",
+                "desc": f"¡Nueva versión {latest_v} disponible! (Presiona 'u' para descargar)",
+                "aliases": ["u", "update", "actualizar", "version"],
+                "highlight": True,
+            })
 
-        if update_info and update_info.get("has_update"):
-            panel_subtitle = f"[bold bright_green]✨ ¡Nueva versión {update_info['latest_version']} disponible! Escribe 'u' o el comando deseado[/bold bright_green]"
-        else:
-            panel_subtitle = "[dim grey42] Escribe un número o el nombre del comando [/dim grey42]"
+        options.append({"is_separator": True, "title": ""})
+        options.append({
+            "id": "0",
+            "key_label": "[0]",
+            "icon": "❌",
+            "command": "exit",
+            "desc": "Salir",
+            "aliases": ["0", "exit", "quit", "q"],
+        })
 
-        console.print(Panel(
-            menu_table,
-            title="[bold white] Comandos [/bold white]",
-            title_align="left",
-            subtitle=panel_subtitle,
-            subtitle_align="left",
-            border_style="grey37",
-            box=box.ROUNDED,
-            padding=(0, 1)
-        ))
-        console.print()
-
-        choice = Prompt.ask("[bold bright_cyan]bb-cli[/bold bright_cyan] [dim grey50]❯[/dim grey50]", default="1")
+        choice = hybrid_select(
+            options=options,
+            title="Comandos",
+            header_func=lambda: print_header(user),
+            tip_text=get_random_tip(),
+            default_idx=0
+        )
         choice = choice.strip().lower()
 
         if choice in ["1", "sync"]:
-            cmd_sync()
+            res = cmd_sync()
+            if not res:
+                continue
         elif choice in ["2", "agenda", "calendar"]:
             cmd_agenda()
         elif choice in ["3", "cursos", "courses"]:
@@ -935,9 +1053,20 @@ def interactive_menu():
         elif choice in ["6", "logout"]:
             cmd_logout()
         elif choice in ["7", "notebook", "export"]:
-            cmd_notebook()
+            res = cmd_notebook()
+            if not res:
+                continue
         elif choice in ["8", "institucion", "universidad", "university", "inst"]:
             cmd_institution()
+            continue
+        elif choice in ["o", "abrir", "open"]:
+            cmd_open_cuadernos()
+            continue
+        elif choice in ["g", "gemini", "notebooklm"]:
+            cmd_open_gemini()
+            continue
+        elif choice in ["w", "web", "aula"]:
+            cmd_open_web()
             continue
         elif choice in ["u", "update", "actualizar", "version"]:
             cmd_update(update_info)
@@ -950,39 +1079,49 @@ def interactive_menu():
         else:
             console.print(f"[red]  ✖ Comando no reconocido: {choice}[/red]")
 
-        console.print("\n[dim grey50]  Presiona ENTER para continuar...[/dim grey50]")
-        input()
+        if hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+            console.print("\n[dim grey50]  Presiona ENTER para continuar...[/dim grey50]")
+            try:
+                input()
+            except (EOFError, KeyboardInterrupt):
+                pass
 
 
 def main():
     try:
         if not is_institution_configured():
-            if len(sys.argv) <= 1 or sys.argv[1].lower() not in ["institucion", "universidad", "university", "inst"]:
+            if len(sys.argv) <= 1 or sys.argv[1].lower() not in ["8", "institucion", "universidad", "university", "inst"]:
                 cmd_institution(is_first_time=True)
 
         if len(sys.argv) > 1:
             arg = sys.argv[1].lower()
-            if arg == "login":
-                cmd_login()
-            elif arg == "status":
-                cmd_status()
-            elif arg in ["courses", "cursos"]:
-                cmd_courses()
-            elif arg in ["agenda", "calendar", "examenes"]:
-                cmd_agenda()
-            elif arg == "sync":
+            if arg in ["1", "sync"]:
                 cmd_sync()
-            elif arg == "logout":
+            elif arg in ["2", "agenda", "calendar", "examenes"]:
+                cmd_agenda()
+            elif arg in ["3", "courses", "cursos"]:
+                cmd_courses()
+            elif arg in ["4", "status"]:
+                cmd_status()
+            elif arg in ["5", "login"]:
+                cmd_login()
+            elif arg in ["6", "logout"]:
                 cmd_logout()
-            elif arg in ["notebook", "export"]:
+            elif arg in ["7", "notebook", "export"]:
                 cmd_notebook()
-            elif arg in ["institucion", "universidad", "university", "inst"]:
+            elif arg in ["8", "institucion", "universidad", "university", "inst"]:
                 cmd_institution()
             elif arg in ["update", "actualizar", "version"]:
                 cmd_update()
+            elif arg in ["o", "open", "abrir"]:
+                cmd_open_cuadernos()
+            elif arg in ["g", "gemini", "notebooklm"]:
+                cmd_open_gemini()
+            elif arg in ["w", "web", "aula"]:
+                cmd_open_web()
             else:
                 console.print(f"[red]Comando desconocido: {arg}[/red]")
-                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion, update")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion, update, abrir, gemini, web")
         else:
             interactive_menu()
     except KeyboardInterrupt:
