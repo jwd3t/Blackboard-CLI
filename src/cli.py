@@ -568,7 +568,7 @@ def _run_sync_single_course(organizer, selected_course, target_section=None):
 def _export_course_to_gemini(course_dir: Path, manifest: list[dict] | None = None):
     with console.status(f"[bold cyan]Generando carpeta unificada para Gemini Notebook en {course_dir.name}...[/bold cyan]"):
         count = generate_gemini_notebook(course_dir, manifest)
-    console.print(f"[bold green]✔ Carpeta gemini_notebook/ lista con {count} archivos unificados.[/bold green]")
+    console.print(f"[bold green]✔ Carpeta gemini_notebook/ lista con {count} archivos unificados (Markdown AnyDoc y SKILL.md incluidos).[/bold green]")
 
 
 def cmd_notebook():

@@ -10,6 +10,15 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ## [3.0.0] - 2026-09-30
 
 ### ✨ Añadido
+- **Motor AnyDoc de Conversión a Markdown Integrado (`firecrawl-anydoc`):**
+  - Conversión automática y ultrarrápida de documentos (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.csv`, etc.) a formato Markdown limpio (`.md`).
+  - Coexistencia *side-by-side*: cada documento original conserva su gemelo `.md` adyacente en el mismo directorio del curso y en `gemini_notebook/`.
+  - Motor Rust 100% local sin costos ni dependencias de APIs en la nube. Fallback silencioso y resiliente ante archivos no estándar o corruptos.
+- **Generación Automática de Skills para Agentes IA (`SKILL.md`):**
+  - Creación de `SKILL.md` y `.skills/estudio-curso/SKILL.md` con frontmatter YAML dentro de cada cuaderno de curso.
+  - Instrucciones especializadas para Antigravity, Claude, ChatGPT, Gemini y Cursor que obligan al modelo a priorizar los archivos `.md` de AnyDoc, ahorrando más del 90% de ventana de contexto en consultas.
+  - Mapeo de reglas para exámenes (`agenda_evaluaciones.md`), sílabo oficial y temarios por semana.
+  - Generación de `SKILL.md` maestro en la raíz de `cuadernos/` (`.skills/estudio-semestre/SKILL.md`) coordinado con `RESUMEN_SEMESTRE_IA.md`.
 - **Control Híbrido y Motor de UI Desacoplado (`src/terminal_ui.py`):**
   - Navegación instantánea por teclado con flechas `[▲/▼]` con rotación cíclica suave (*wrap-around*) y selección con `Enter`.
   - Buffer de texto simultáneo en tiempo real: teclea números o comandos (`sync`, `o`, `status`, etc.) con borrado `Backspace`, viendo cómo el cursor salta a la opción en vivo.

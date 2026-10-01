@@ -56,32 +56,38 @@ Al sincronizar, se creará una carpeta llamada `cuadernos/` con una estructura l
 
 ```text
 cuadernos/
-├── RESUMEN_SEMESTRE_IA.md        <-- 🧠 Índice general del ciclo con radar de exámenes
+├── SKILL.md                      <-- 🧠 Guía maestra del semestre para Agentes IA
+├── RESUMEN_SEMESTRE_IA.md        <-- 📊 Índice general del ciclo con radar de exámenes
 └── [CODIGO] Nombre del Curso/
+    ├── SKILL.md                  <-- 🎓 Skill de IA del curso (prioriza AnyDoc .md)
     ├── CUADERNO_CURSO.md         <-- 📓 Cuaderno maestro del curso con fórmulas y enlaces
-    ├── 00_INFORMACION_GENERAL/   <-- 📄 Sílabos, normas del curso y plan calendario
+    ├── 00_INFORMACION_GENERAL/   <-- 📄 Sílabos, normas del curso y plan calendario (.md y original)
     ├── 01_EVALUACIONES_Y_EXAMENES/
     │   └── agenda_evaluaciones.md <-- 📅 Fechas, temas de evaluaciones y ponderaciones
     ├── 02_MATERIALES_Y_CLASES/   <-- 📚 Contenido organizado por Semanas o Unidades
     │   ├── Semana 01/
+    │   │   ├── diapositivas.pptx <-- 📦 Archivo original
+    │   │   └── diapositivas.md   <-- ⚡ Versión Markdown limpia vía AnyDoc
     │   └── Semana 02/
     ├── 03_ANUNCIOS/
     │   └── historial_anuncios.md <-- 📢 Comunicados oficiales del profesor
-    └── gemini_notebook/          <-- 🤖 (Opcional) Carpeta plana generada con el comando `notebook` lista para arrastrar a NotebookLM
+    └── gemini_notebook/          <-- 🤖 Carpeta plana con prefijos uX_sXX (AnyDoc .md + originales) lista para NotebookLM
 ```
 
 ---
 
 ## 🤖 ¿Cómo estudiar con IA usando estos cuadernos?
 
-Una vez descargados tus cuadernos, puedes abrir la carpeta en tu editor favorito (Cursor, VS Code, Obsidian) o arrastrar los archivos a cualquier IA:
-
+* **Detección automática de Skills (`SKILL.md`):**
+  Al abrir la carpeta en herramientas como **Antigravity**, **Cursor** o **Claude Code**, el agente leerá automáticamente el archivo `SKILL.md` del curso, aprendiendo a priorizar los archivos `.md` de AnyDoc, respetando los temarios y resolviendo dudas con respuestas precisas.
+* **Velocidad y Ahorro de Tokens con AnyDoc:**
+  Gracias a la conversión automática a `.md`, los modelos no necesitan procesar pesados binarios PPTX o PDFs, ahorrando hasta un 90% de ventana de contexto y respondiendo en segundos.
 * **Preguntar por evaluaciones:**
   > *"¿Qué evaluaciones tengo en las próximas dos semanas y cuál tiene mayor peso porcentual?"*  
   *(La IA leerá `cuadernos/RESUMEN_SEMESTRE_IA.md` y las agendas).*
 * **Estudiar temas semanales:**
   > *"Explícame de forma sencilla el contenido teórico de la Semana 03 de este curso."*  
-  *(La IA consultará los archivos Markdown de la semana seleccionada).*
+  *(La IA consultará los archivos Markdown convertidos de la semana seleccionada).*
 * **Consultar fórmulas de calificación:**
   > *"¿Cuánto necesito sacar en el examen final para aprobar el curso según la fórmula del sílabo?"*
 

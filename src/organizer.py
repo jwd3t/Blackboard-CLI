@@ -23,6 +23,7 @@ from config import (
     DIR_GEMINI_NOTEBOOK,
     KEYWORDS_INFO_GENERAL,
     SUPPORTED_EXTENSIONS,
+    ANYDOC_SUPPORTED_EXTENSIONS,
 )
 from ultra_client import UltraClient
 
@@ -47,10 +48,233 @@ def parse_week_number(text: str) -> int | None:
     return None
 
 
+def convert_to_markdown_anydoc(file_path: Path, force: bool = False) -> Path | None:
+    """
+    Convierte un documento soportado (.pdf, .docx, .pptx, etc.) a Markdown limpio usando AnyDoc.
+    Guarda el archivo .md en el mismo directorio que el archivo original para que convivan juntos.
+    Retorna la ruta al archivo .md generado o existente, o None si no aplica o falla.
+    """
+    if not file_path.is_file() or file_path.stat().st_size == 0:
+        return None
+
+    ext = file_path.suffix.lower()
+    if ext not in ANYDOC_SUPPORTED_EXTENSIONS or ext == ".md":
+        return None
+
+    target_md = file_path.with_suffix(".md")
+    if target_md.exists() and target_md.stat().st_size > 0 and not force:
+        return target_md
+
+    try:
+        import anydoc
+        md_text = anydoc.to_markdown(str(file_path))
+        if not md_text or not md_text.strip():
+            return None
+
+        header = (
+            f"<!-- Documento convertido automáticamente a Markdown vía AnyDoc -->\n"
+            f"<!-- Archivo original: {file_path.name} -->\n\n"
+        )
+        target_md.write_text(header + md_text.strip() + "\n", encoding="utf-8")
+        return target_md
+    except Exception:
+        # Fallback silencioso ante archivos corruptos, PDFs escaneados o formatos incompatibles
+        return None
+
+
+def convert_course_materials_to_markdown(course_dir: Path, progress_callback=None) -> int:
+    """
+    Recorre los materiales y documentos de información general del curso y
+    convierte todos los archivos soportados a Markdown con AnyDoc.
+    """
+    converted = 0
+    dirs_to_check = [course_dir / DIR_INFO_GENERAL, course_dir / DIR_MATERIALES]
+    for d in dirs_to_check:
+        if not d.exists():
+            continue
+        for file in sorted(d.rglob("*")):
+            if file.is_file() and file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and file.suffix.lower() != ".md":
+                md_path = convert_to_markdown_anydoc(file)
+                if md_path and md_path.exists():
+                    converted += 1
+                    if progress_callback:
+                        progress_callback("log", f"  📄 [dim green]Convertido a Markdown:[/dim green] [dim]{md_path.name}[/dim]")
+    return converted
+
+
+def generate_course_skill(
+    course_dir: Path,
+    course: dict | None = None,
+    evaluations: list[dict] | None = None,
+    announcements: list[dict] | None = None,
+) -> Path:
+    """
+    Genera el archivo de skill para agentes de IA (SKILL.md y .skills/estudio-curso/SKILL.md)
+    dentro del cuaderno del curso, instruyendo a modelos de IA sobre cómo navegar los materiales,
+    priorizar archivos Markdown (.md generados con AnyDoc) y resolver consultas académicas.
+    """
+    if course:
+        name = course.get("name", course_dir.name)
+        code = course.get("course_id", "")
+    else:
+        m = re.match(r"^\[(.*?)\]\s*(.*)$", course_dir.name)
+        if m:
+            code = m.group(1).strip()
+            name = m.group(2).strip()
+        else:
+            code = ""
+            name = course_dir.name
+
+    slug_raw = (code or name).lower()
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", slug_raw).strip("-")
+    skill_name = f"estudio-{slug}" if slug else "estudio-curso"
+
+    lines = [
+        "---",
+        f"name: {skill_name}",
+        f"description: \"Guía de estudio inteligente y navegación para el curso {name} ({code}). Instrucciones para priorizar documentos Markdown convertidos con AnyDoc, consultar temarios de exámenes y navegar clases.\"",
+        "---",
+        "",
+        f"# 🎓 Skill de Asistente de Estudio: {name}" + (f" ({code})" if code else ""),
+        "",
+        "Esta skill proporciona las directivas y pautas de navegación para cualquier agente de inteligencia artificial (Antigravity, Claude, ChatGPT, Gemini, Cursor) que asista al estudiante en este curso.",
+        "",
+        "---",
+        "",
+        "## ⚡ Regla de Oro: Prioridad de Archivos Markdown (AnyDoc)",
+        "",
+        "Todos los documentos del curso (`.docx`, `.pptx`, `.pdf`, `.xlsx`, etc.) han sido procesados y convertidos automáticamente a **Markdown (.md)** mediante el motor AnyDoc, conviviendo lado a lado con sus archivos originales.",
+        "",
+        "1. **Lectura Inteligente y Ahorro de Tokens**:",
+        "   - **SIEMPRE lee prioritariamente los archivos `.md` complementarios** antes de abrir un archivo binario o PDF.",
+        "   - Los archivos `.md` contienen texto limpio, tablas CommonMark y la estructura jerárquica del contenido consumiendo hasta un **90% menos de tokens** de ventana de contexto.",
+        "2. **Coexistencia con Archivos Originales**:",
+        "   - Cada archivo fuente (por ejemplo `Semana 02/diapositivas.pptx`) cuenta con su gemelo `Semana 02/diapositivas.md` en la misma ruta.",
+        "   - Si el usuario te pide un enlace directo, descargar el archivo original o inspeccionar diagramas visuales muy complejos, referencia la ruta del archivo original (`.pptx`, `.pdf`, etc.). Para explicaciones, resúmenes, fórmulas y resolución de dudas, usa el archivo `.md`.",
+        "",
+        "---",
+        "",
+        "## 📂 Arquitectura del Cuaderno de Estudio",
+        "",
+        "El curso está organizado de forma estandarizada y predecible:",
+        "",
+        f"- 📁 `{DIR_INFO_GENERAL}/`: Sílabo oficial, plan calendario y sistema de evaluación (fórmulas de notas, pesos de PCs, parcial y final).",
+        f"- 📅 `{DIR_EVALUACIONES}/agenda_evaluaciones.md`: Calendario cronológico de todas las entregas, tareas, prácticas y exámenes parciales/finales con las rúbricas y temarios de qué entra en cada prueba.",
+        f"- 📚 `{DIR_MATERIALES}/`: Organización jerárquica (`Unidad X › Semana YY`). Diapositivas de clase, guías de laboratorio y lecturas complementarias con sus archivos `.md` correspondientes.",
+        f"- 📢 `{DIR_ANUNCIOS}/historial_anuncios.md`: Comunicados oficiales del profesor, cambios de fecha y recordatorios emitidos en el aula virtual.",
+        f"- 🤖 `{DIR_GEMINI_NOTEBOOK}/`: Carpeta plana unificada con nomenclatura `u{{unidad}}_s{{semana}}_{{idx}}_{{nombre}}` tanto para archivos originales como para sus equivalentes `.md`, lista para ser cargada en Google NotebookLM o entornos Gemini.",
+        "",
+        "---",
+        "",
+        "## 🛠️ Flujos de Trabajo para el Asistente IA",
+        "",
+        "### 1. ¿Qué entra en el próximo examen / evaluación?",
+        f"1. Consulta primero `{DIR_EVALUACIONES}/agenda_evaluaciones.md` para identificar la fecha límite, tipo de evaluación y las instrucciones registradas por el profesor.",
+        f"2. Identifica las semanas correspondientes en `{DIR_MATERIALES}/` que comprende dicha evaluación.",
+        "3. Lee los archivos `.md` de esas semanas para extraer los temas centrales y preparar simulacros de preguntas, resúmenes de conceptos y fórmulas clave.",
+        "",
+        "### 2. Dudas sobre una clase o semana en específico",
+        f"1. Dirígete directamente a la carpeta de la semana en `{DIR_MATERIALES}/` (o al prefijo `uX_sXX_...` en `{DIR_GEMINI_NOTEBOOK}/`).",
+        "2. Abre y analiza los archivos `.md` asociados a las diapositivas o guías.",
+        "3. Responde al estudiante con explicaciones paso a paso basadas en la teoría oficial del curso.",
+        "",
+        "### 3. Fórmulas de calificación y promedios",
+        f"1. Revisa `{DIR_INFO_GENERAL}/` (especialmente el sílabo en `.md`).",
+        "2. Explica la fórmula de nota final y qué nota mínima necesita el estudiante según su rendimiento.",
+        "",
+        "### 4. Generación de Flashcards y Cuestionarios",
+        f"Utiliza la información consolidada en los archivos `.md` de `{DIR_MATERIALES}/` para generar flashcards en formato Q&A o preguntas de opción múltiple con justificación detallada de cada alternativa.",
+        ""
+    ]
+
+    skill_content = "\n".join(lines)
+
+    # 1. En la raíz del curso
+    skill_path = course_dir / "SKILL.md"
+    try:
+        skill_path.write_text(skill_content, encoding="utf-8")
+    except Exception:
+        pass
+
+    # 2. En .skills/estudio-curso/SKILL.md (estándar para herramientas que buscan en .skills/)
+    sub_skill_dir = course_dir / ".skills" / "estudio-curso"
+    try:
+        sub_skill_dir.mkdir(parents=True, exist_ok=True)
+        (sub_skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
+    except Exception:
+        pass
+
+    # 3. En gemini_notebook si existe
+    gemini_dir = course_dir / DIR_GEMINI_NOTEBOOK
+    if gemini_dir.exists():
+        try:
+            (gemini_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
+        except Exception:
+            pass
+
+    return skill_path
+
+
+def generate_semester_skill(
+    output_dir: Path,
+    courses: list[dict],
+    all_evaluations: list[dict],
+) -> Path:
+    """
+    Genera el archivo SKILL.md y .skills/estudio-semestre/SKILL.md a nivel de la carpeta general
+    de cuadernos, permitiendo que la IA comprenda el panorama global del ciclo académico.
+    """
+    lines = [
+        "---",
+        "name: estudio-semestre",
+        "description: \"Guía de estudio transversal para el semestre universitario. Monitorea fechas de exámenes entre todos los cursos y coordina la navegación de cuadernos convertidos con AnyDoc.\"",
+        "---",
+        "",
+        "# 🎓 Skill Maestra de Semestre: Panorama Global e Inteligencia de Estudio",
+        "",
+        "Esta skill instruye a cualquier agente de inteligencia artificial sobre cómo asistir al estudiante en la totalidad de sus asignaturas matriculadas durante el semestre académico actual.",
+        "",
+        "---",
+        "",
+        "## 🧭 Navegación Global",
+        "- **Resumen Semestral**: Consulta `RESUMEN_SEMESTRE_IA.md` para ver el consolidado de cursos matriculados y el calendario unificado de exámenes.",
+        "- **Cuadernos Individuales**: Cada curso cuenta con su propia carpeta estructurada (`[CODIGO] Nombre del Curso`), conteniendo:",
+        "  - Su propio `SKILL.md` con las instrucciones específicas de la asignatura.",
+        "  - `CUADERNO_CURSO.md` con los enlaces directos y portada.",
+        f"  - `{DIR_INFO_GENERAL}/` (Sílabos y fórmulas).",
+        f"  - `{DIR_EVALUACIONES}/agenda_evaluaciones.md` (Fechas y temarios).",
+        f"  - `{DIR_MATERIALES}/` (Clases semanales con archivos originales y sus versiones `.md` por AnyDoc).",
+        f"  - `{DIR_ANUNCIOS}/historial_anuncios.md` (Avisos del profesor).",
+        f"  - `{DIR_GEMINI_NOTEBOOK}/` (Carpeta plana unificada para Google NotebookLM).",
+        "",
+        "## ⚡ Prioridad AnyDoc en Todos los Cursos",
+        "- En cada curso, los documentos (`.docx`, `.pptx`, `.pdf`, etc.) coexisten con sus versiones `.md` generadas con AnyDoc.",
+        "- **Lee prioritariamente los archivos `.md`** para ahorrar ventana de contexto y procesar la información de forma inmediata.",
+        ""
+    ]
+
+    skill_content = "\n".join(lines)
+    skill_path = output_dir / "SKILL.md"
+    try:
+        skill_path.write_text(skill_content, encoding="utf-8")
+    except Exception:
+        pass
+
+    sub_skill_dir = output_dir / ".skills" / "estudio-semestre"
+    try:
+        sub_skill_dir.mkdir(parents=True, exist_ok=True)
+        (sub_skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
+    except Exception:
+        pass
+
+    return skill_path
+
+
 def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = None) -> int:
     """
     Genera la carpeta plana unificada para Gemini Notebook.
     Usa el manifiesto si se provee, o escanea el disco si no.
+    Copia tanto los archivos originales como sus versiones Markdown generadas por AnyDoc.
     """
     gemini_dir = course_dir / DIR_GEMINI_NOTEBOOK
     gemini_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +295,12 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
 
             if not local_path.exists() or local_path.stat().st_size == 0:
                 continue
-            
+
+            # Si es un .md complementario cuyo archivo original existe, se copia junto al original
+            if local_path.suffix.lower() == ".md":
+                if any(local_path.with_suffix(ext).exists() for ext in ANYDOC_SUPPORTED_EXTENSIONS if ext != ".md"):
+                    continue
+
             # Solo copiamos archivos soportados (PDF, PPTX, etc) o sin extensión válida
             if local_path.suffix.lower() not in SUPPORTED_EXTENSIONS and local_path.suffix:
                 continue
@@ -92,6 +321,18 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
 
             shutil.copy2(local_path, gemini_dir / new_name)
             count += 1
+
+            # Copiar o generar versión Markdown de AnyDoc adyacente en gemini_notebook
+            if local_path.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and local_path.suffix.lower() != ".md":
+                companion_md = local_path.with_suffix(".md")
+                if not companion_md.exists() or companion_md.stat().st_size == 0:
+                    companion_md = convert_to_markdown_anydoc(local_path)
+                if companion_md and companion_md.exists():
+                    target_md_name = f"{Path(new_name).stem}.md"
+                    shutil.copy2(companion_md, gemini_dir / target_md_name)
+                    count += 1
+
+        generate_course_skill(course_dir)
         return count
 
     # Escaneo en disco
@@ -100,10 +341,23 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
         idx = 1
         for file in sorted(info_dir.rglob("*")):
             if file.is_file() and (file.suffix.lower() in SUPPORTED_EXTENSIONS or not file.suffix):
+                # Omitir .md que sean complementarios de otro archivo en el mismo directorio
+                if file.suffix.lower() == ".md" and any(file.with_suffix(ext).exists() for ext in ANYDOC_SUPPORTED_EXTENSIONS if ext != ".md"):
+                    continue
                 new_name = f"u0_s00_{idx:02d}_{file.name}"
                 shutil.copy2(file, gemini_dir / new_name)
                 idx += 1
                 count += 1
+
+                # Copiar o generar versión Markdown AnyDoc adyacente
+                if file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and file.suffix.lower() != ".md":
+                    companion_md = file.with_suffix(".md")
+                    if not companion_md.exists() or companion_md.stat().st_size == 0:
+                        companion_md = convert_to_markdown_anydoc(file)
+                    if companion_md and companion_md.exists():
+                        target_md_name = f"{Path(new_name).stem}.md"
+                        shutil.copy2(companion_md, gemini_dir / target_md_name)
+                        count += 1
 
     mat_dir = course_dir / DIR_MATERIALES
     if mat_dir.exists():
@@ -111,6 +365,8 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
         # Ordenamos para asegurar que el correlativo se asigne de forma determinista
         for file in sorted(mat_dir.rglob("*")):
             if file.is_file() and (file.suffix.lower() in SUPPORTED_EXTENSIONS or not file.suffix):
+                if file.suffix.lower() == ".md" and any(file.with_suffix(ext).exists() for ext in ANYDOC_SUPPORTED_EXTENSIONS if ext != ".md"):
+                    continue
                 rel_parts = file.relative_to(mat_dir).parts
                 path_str = " ".join(rel_parts)
                 u_num = parse_unit_number(path_str) or 0
@@ -124,6 +380,17 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
                 shutil.copy2(file, gemini_dir / new_name)
                 count += 1
 
+                # Copiar o generar versión Markdown AnyDoc adyacente
+                if file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and file.suffix.lower() != ".md":
+                    companion_md = file.with_suffix(".md")
+                    if not companion_md.exists() or companion_md.stat().st_size == 0:
+                        companion_md = convert_to_markdown_anydoc(file)
+                    if companion_md and companion_md.exists():
+                        target_md_name = f"{Path(new_name).stem}.md"
+                        shutil.copy2(companion_md, gemini_dir / target_md_name)
+                        count += 1
+
+    generate_course_skill(course_dir)
     return count
 
 
@@ -285,6 +552,22 @@ class CourseNotebookOrganizer:
             downloaded_files=downloaded_files
         )
 
+        # 5. Convertir materiales a Markdown vía AnyDoc (side-by-side) y generar Skill de IA
+        if progress_callback:
+            progress_callback("action", f"[{course_name[:25]}] Convirtiendo materiales a Markdown con AnyDoc...")
+        converted_count = convert_course_materials_to_markdown(course_dir, progress_callback=progress_callback)
+        if converted_count > 0 and progress_callback:
+            progress_callback("log", f"✨ {converted_count} documentos convertidos a Markdown para IA")
+
+        generate_course_skill(
+            course_dir=course_dir,
+            course=course,
+            evaluations=evaluations,
+            announcements=announcements
+        )
+        if progress_callback:
+            progress_callback("log", f"🧠 Skill de IA configurada para el curso (SKILL.md)")
+
         return {
             "name": course_name,
             "code": course_code,
@@ -423,6 +706,8 @@ class CourseNotebookOrganizer:
                             "path": str(dest_file.relative_to(self.output_dir)),
                             "is_info_general": (dest_dir == info_dir)
                         })
+                        if dest_file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and dest_file.suffix.lower() != ".md":
+                            convert_to_markdown_anydoc(dest_file)
                         continue
 
                     download_url = att.get("downloadUrl")
@@ -447,6 +732,8 @@ class CourseNotebookOrganizer:
                                 "path": str(dest_file.relative_to(self.output_dir)),
                                 "is_info_general": (dest_dir == info_dir)
                             })
+                            if dest_file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and dest_file.suffix.lower() != ".md":
+                                convert_to_markdown_anydoc(dest_file)
 
             # 2. Si tiene lecturas o recursos embebidos (ej: documentos de Blackboard con links bbcswebdav)
             embedded_files = list(node.get("embedded_files", []))
@@ -502,6 +789,9 @@ class CourseNotebookOrganizer:
                             "path": str((dest_dir / existing_name).relative_to(self.output_dir)),
                             "is_info_general": (dest_dir == info_dir)
                         })
+                        emb_file = dest_dir / existing_name
+                        if emb_file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and emb_file.suffix.lower() != ".md":
+                            convert_to_markdown_anydoc(emb_file)
                     continue
 
                 # 2. Si no está en disco, realizar la petición y descarga
@@ -532,6 +822,9 @@ class CourseNotebookOrganizer:
                         "path": str((dest_dir / saved_name).relative_to(self.output_dir)),
                         "is_info_general": (dest_dir == info_dir)
                     })
+                    saved_file = dest_dir / saved_name
+                    if saved_file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and saved_file.suffix.lower() != ".md":
+                        convert_to_markdown_anydoc(saved_file)
                 else:
                     # Fue ignorado (imagen/banner decorativo o no descargable)
                     ignored_banner_urls.add(emb_url)
@@ -731,3 +1024,6 @@ class CourseNotebookOrganizer:
 
         with open(master_file, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
+
+        # Generar skill maestro del semestre para asistentes IA
+        generate_semester_skill(self.output_dir, courses, all_evaluations)

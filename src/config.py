@@ -349,5 +349,12 @@ KEYWORDS_INFO_GENERAL = [
 # Extensiones de archivos de interés para descarga
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".pptx", ".ppt", ".docx", ".doc",
-    ".xlsx", ".xls", ".zip", ".rar", ".txt", ".csv"
+    ".xlsx", ".xls", ".zip", ".rar", ".txt", ".csv", ".md"
+}
+
+# Extensiones de documentos convertibles a Markdown vía AnyDoc
+ANYDOC_SUPPORTED_EXTENSIONS = {
+    ".pdf", ".pptx", ".ppt", ".docx", ".doc",
+    ".xlsx", ".xls", ".csv", ".rtf", ".epub",
+    ".odt", ".ods", ".odp"
 }
