@@ -184,6 +184,15 @@ def generate_course_skill(
         "",
         "### 4. Generación de Flashcards y Cuestionarios",
         f"Utiliza la información consolidada en los archivos `.md` de `{DIR_MATERIALES}/` para generar flashcards en formato Q&A o preguntas de opción múltiple con justificación detallada de cada alternativa.",
+        "",
+        "### 5. Conversión de Nuevos Archivos con AnyDoc en Tiempo Real",
+        "Si el estudiante añade un archivo nuevo (`.docx`, `.pptx`, `.pdf`, `.xlsx`, `.csv`) que aún no tenga su gemelo `.md`, puedes convertirlo directamente en el entorno con AnyDoc:",
+        "```python",
+        "import anydoc",
+        "from pathlib import Path",
+        "doc = Path('ruta/al/documento.docx')",
+        "doc.with_suffix('.md').write_text(anydoc.to_markdown(str(doc)), encoding='utf-8')",
+        "```",
         ""
     ]
 
@@ -250,6 +259,7 @@ def generate_semester_skill(
         "## ⚡ Prioridad AnyDoc en Todos los Cursos",
         "- En cada curso, los documentos (`.docx`, `.pptx`, `.pdf`, etc.) coexisten con sus versiones `.md` generadas con AnyDoc.",
         "- **Lee prioritariamente los archivos `.md`** para ahorrar ventana de contexto y procesar la información de forma inmediata.",
+        "- Si el estudiante agrega nuevos documentos no convertidos, puedes usar AnyDoc en Python: `import anydoc; anydoc.to_markdown('archivo')`.",
         ""
     ]
 
