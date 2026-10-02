@@ -7,7 +7,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-## [3.0.0] - 2026-09-30
+## [3.1.0] - 2026-10-01
 
 ### ✨ Añadido
 - **Motor AnyDoc de Conversión a Markdown Integrado (`firecrawl-anydoc`):**
@@ -19,6 +19,13 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Instrucciones especializadas para Antigravity, Claude, ChatGPT, Gemini y Cursor que obligan al modelo a priorizar los archivos `.md` de AnyDoc, ahorrando más del 90% de ventana de contexto en consultas.
   - Mapeo de reglas para exámenes (`agenda_evaluaciones.md`), sílabo oficial y temarios por semana.
   - Generación de `SKILL.md` maestro en la raíz de `cuadernos/` (`.skills/estudio-semestre/SKILL.md`) coordinado con `RESUMEN_SEMESTRE_IA.md`.
+  - Instrucciones integradas en la skill para convertir nuevos archivos al vuelo con AnyDoc en Python (`import anydoc; anydoc.to_markdown(...)`).
+
+---
+
+## [3.0.0] - 2026-09-30
+
+### ✨ Añadido
 - **Control Híbrido y Motor de UI Desacoplado (`src/terminal_ui.py`):**
   - Navegación instantánea por teclado con flechas `[▲/▼]` con rotación cíclica suave (*wrap-around*) y selección con `Enter`.
   - Buffer de texto simultáneo en tiempo real: teclea números o comandos (`sync`, `o`, `status`, etc.) con borrado `Backspace`, viendo cómo el cursor salta a la opción en vivo.

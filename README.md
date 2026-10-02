@@ -11,7 +11,7 @@ No necesitas configurar entornos manualmente. El programa incluye gestores autom
 1. **Descarga y descomprime:**
    - Descarga el archivo [Blackboard-CLI.zip](https://github.com/jwd3t/Blackboard-CLI/releases) desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
 2. **Ejecutar:**
-   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v3.0.0-Windows.bat`).
+   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v3.1.0-Windows.bat`).
    - **En Mac:** Haz doble clic en **`BlackboardCLI-v*.command`** (o en la terminal: `./BlackboardCLI-v*.command`).
    - **En Linux:** Abre la terminal en la carpeta y ejecuta **`./BlackboardCLI-v*.sh`**.
    - *Nota de la primera vez:* En su primer arranque, el programa creará automáticamente un entorno virtual aislado (`.venv`) e instalará las librerías necesarias. **No dejará ningún residuo en tu sistema.**
