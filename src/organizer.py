@@ -213,13 +213,15 @@ def generate_course_skill(
     except Exception:
         pass
 
-    # 3. En gemini_notebook si existe
+    # 3. Limpiar SKILL.md de gemini_notebook si existía de versiones previas
     gemini_dir = course_dir / DIR_GEMINI_NOTEBOOK
     if gemini_dir.exists():
-        try:
-            (gemini_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
-        except Exception:
-            pass
+        skill_in_gemini = gemini_dir / "SKILL.md"
+        if skill_in_gemini.exists():
+            try:
+                skill_in_gemini.unlink()
+            except Exception:
+                pass
 
     return skill_path
 
@@ -280,15 +282,60 @@ def generate_semester_skill(
     return skill_path
 
 
+def is_anydoc_companion_markdown(path: Path) -> bool:
+    """
+    Determina si un archivo .md es una versión complementaria generada por AnyDoc
+    a partir de un archivo binario existente, o si es un archivo de sistema/skill/agenda.
+    Retorna False únicamente si es un documento de texto/lectura nativo de Blackboard.
+    """
+    if path.suffix.lower() != ".md":
+        return False
+
+    name_upper = path.name.upper()
+    if name_upper in [
+        "SKILL.MD",
+        "AGENDA_EVALUACIONES.MD",
+        "HISTORIAL_ANUNCIOS.MD",
+        "CUADERNO_CURSO.MD",
+        "RESUMEN_SEMESTRE_IA.MD",
+    ]:
+        return True
+
+    # 1. Si existe un archivo original con el mismo nombre y extensión binaria en el mismo directorio
+    for ext in ANYDOC_SUPPORTED_EXTENSIONS:
+        if ext != ".md" and path.with_suffix(ext).exists():
+            return True
+
+    # 2. Si contiene el encabezado característico de conversión AnyDoc
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            first_lines = "".join(f.readline() for _ in range(3))
+            if "AnyDoc" in first_lines or "Documento convertido" in first_lines:
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
 def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = None) -> int:
     """
     Genera la carpeta plana unificada para Gemini Notebook.
     Usa el manifiesto si se provee, o escanea el disco si no.
-    Copia tanto los archivos originales como sus versiones Markdown generadas por AnyDoc.
+    Solo incluye los materiales originales (PDF, PPTX, DOCX, etc.) y documentos
+    de lectura nativos de Blackboard, excluyendo versiones .md de AnyDoc y SKILL.md.
     """
     gemini_dir = course_dir / DIR_GEMINI_NOTEBOOK
     gemini_dir.mkdir(parents=True, exist_ok=True)
     count = 0
+
+    # Limpiar posibles archivos .md de AnyDoc o SKILL.md que hayan quedado previamente en gemini_notebook
+    for f in gemini_dir.iterdir():
+        if f.is_file() and is_anydoc_companion_markdown(f):
+            try:
+                f.unlink()
+            except Exception:
+                pass
 
     if manifest is not None:
         is_legacy = any("local_path" not in item or "unit" not in item or "week" not in item for item in manifest)
@@ -306,10 +353,9 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
             if not local_path.exists() or local_path.stat().st_size == 0:
                 continue
 
-            # Si es un .md complementario cuyo archivo original existe, se copia junto al original
-            if local_path.suffix.lower() == ".md":
-                if any(local_path.with_suffix(ext).exists() for ext in ANYDOC_SUPPORTED_EXTENSIONS if ext != ".md"):
-                    continue
+            # Excluir archivos .md de AnyDoc y skills
+            if is_anydoc_companion_markdown(local_path):
+                continue
 
             # Solo copiamos archivos soportados (PDF, PPTX, etc) o sin extensión válida
             if local_path.suffix.lower() not in SUPPORTED_EXTENSIONS and local_path.suffix:
@@ -332,16 +378,6 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
             shutil.copy2(local_path, gemini_dir / new_name)
             count += 1
 
-            # Copiar o generar versión Markdown de AnyDoc adyacente en gemini_notebook
-            if local_path.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and local_path.suffix.lower() != ".md":
-                companion_md = local_path.with_suffix(".md")
-                if not companion_md.exists() or companion_md.stat().st_size == 0:
-                    companion_md = convert_to_markdown_anydoc(local_path)
-                if companion_md and companion_md.exists():
-                    target_md_name = f"{Path(new_name).stem}.md"
-                    shutil.copy2(companion_md, gemini_dir / target_md_name)
-                    count += 1
-
         generate_course_skill(course_dir)
         return count
 
@@ -351,23 +387,13 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
         idx = 1
         for file in sorted(info_dir.rglob("*")):
             if file.is_file() and (file.suffix.lower() in SUPPORTED_EXTENSIONS or not file.suffix):
-                # Omitir .md que sean complementarios de otro archivo en el mismo directorio
-                if file.suffix.lower() == ".md" and any(file.with_suffix(ext).exists() for ext in ANYDOC_SUPPORTED_EXTENSIONS if ext != ".md"):
+                # Omitir .md que sean complementarios de AnyDoc o skills
+                if is_anydoc_companion_markdown(file):
                     continue
                 new_name = f"u0_s00_{idx:02d}_{file.name}"
                 shutil.copy2(file, gemini_dir / new_name)
                 idx += 1
                 count += 1
-
-                # Copiar o generar versión Markdown AnyDoc adyacente
-                if file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and file.suffix.lower() != ".md":
-                    companion_md = file.with_suffix(".md")
-                    if not companion_md.exists() or companion_md.stat().st_size == 0:
-                        companion_md = convert_to_markdown_anydoc(file)
-                    if companion_md and companion_md.exists():
-                        target_md_name = f"{Path(new_name).stem}.md"
-                        shutil.copy2(companion_md, gemini_dir / target_md_name)
-                        count += 1
 
     mat_dir = course_dir / DIR_MATERIALES
     if mat_dir.exists():
@@ -375,7 +401,7 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
         # Ordenamos para asegurar que el correlativo se asigne de forma determinista
         for file in sorted(mat_dir.rglob("*")):
             if file.is_file() and (file.suffix.lower() in SUPPORTED_EXTENSIONS or not file.suffix):
-                if file.suffix.lower() == ".md" and any(file.with_suffix(ext).exists() for ext in ANYDOC_SUPPORTED_EXTENSIONS if ext != ".md"):
+                if is_anydoc_companion_markdown(file):
                     continue
                 rel_parts = file.relative_to(mat_dir).parts
                 path_str = " ".join(rel_parts)
@@ -389,16 +415,6 @@ def generate_gemini_notebook(course_dir: Path, manifest: list[dict] | None = Non
                 new_name = f"u{u_num}_s{w_num:02d}_{idx:02d}_{file.name}"
                 shutil.copy2(file, gemini_dir / new_name)
                 count += 1
-
-                # Copiar o generar versión Markdown AnyDoc adyacente
-                if file.suffix.lower() in ANYDOC_SUPPORTED_EXTENSIONS and file.suffix.lower() != ".md":
-                    companion_md = file.with_suffix(".md")
-                    if not companion_md.exists() or companion_md.stat().st_size == 0:
-                        companion_md = convert_to_markdown_anydoc(file)
-                    if companion_md and companion_md.exists():
-                        target_md_name = f"{Path(new_name).stem}.md"
-                        shutil.copy2(companion_md, gemini_dir / target_md_name)
-                        count += 1
 
     generate_course_skill(course_dir)
     return count

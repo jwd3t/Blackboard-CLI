@@ -76,7 +76,9 @@ class TestGeminiExportAndAnyDoc(unittest.TestCase):
             self.assertTrue("u1_s01_01_diapo.pdf" in files or "u1_s01_02_diapo.pdf" in files)
             self.assertIn("u1_s02_01_lectura.pdf", files)
             self.assertIn("u0_s00_01_otros.pdf", files)
-            self.assertIn("SKILL.md", files)
+            # En gemini_notebook NO debe estar SKILL.md
+            self.assertNotIn("SKILL.md", files)
+            self.assertTrue((course / "SKILL.md").exists())
 
     def test_manifest_copy(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -112,7 +114,8 @@ class TestGeminiExportAndAnyDoc(unittest.TestCase):
             
             self.assertIn("u0_s00_01_silabo.pdf", files)
             self.assertIn("u1_s01_01_diapo.pdf", files)
-            self.assertIn("SKILL.md", files)
+            self.assertNotIn("SKILL.md", files)
+            self.assertTrue((course / "SKILL.md").exists())
 
     def test_anydoc_conversion(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -175,7 +178,7 @@ class TestGeminiExportAndAnyDoc(unittest.TestCase):
             self.assertIn("name: estudio-semestre", content)
             self.assertIn("RESUMEN_SEMESTRE_IA.md", content)
 
-    def test_gemini_notebook_with_anydoc_companion(self):
+    def test_gemini_notebook_excludes_anydoc_and_keeps_real_material(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             base = Path(tmpdir)
             course = base / "[MA101] Calculo I"
@@ -187,20 +190,33 @@ class TestGeminiExportAndAnyDoc(unittest.TestCase):
             csv_file = mat_dir / "datos_limites.csv"
             csv_file.write_text("x,f(x)\n0,1\n1,2", encoding="utf-8")
             
-            # Run convert_course_materials_to_markdown
+            # Documento de texto nativo de Blackboard (lectura sin binario)
+            native_doc = mat_dir / "Recursos_de_aprendizaje.md"
+            native_doc.write_text("# Lectura teórica sobre límites", encoding="utf-8")
+            
+            # Convertir materiales a markdown con AnyDoc (genera datos_limites.md al lado de datos_limites.csv)
             converted = convert_course_materials_to_markdown(course)
             self.assertEqual(converted, 1)
             self.assertTrue((mat_dir / "datos_limites.md").exists())
             
-            # Now run generate_gemini_notebook
+            # Generar gemini_notebook
             count = generate_gemini_notebook(course)
-            # Should have both csv and md in gemini_notebook
             gemini_dir = course / "gemini_notebook"
             files = [f.name for f in gemini_dir.iterdir()]
             
+            # Debe contener el material real original (csv)
             self.assertIn("u1_s01_01_datos_limites.csv", files)
-            self.assertIn("u1_s01_01_datos_limites.md", files)
-            self.assertIn("SKILL.md", files)
+            # Debe contener el documento nativo de Blackboard
+            self.assertIn("u1_s01_02_Recursos_de_aprendizaje.md", files)
+            # NO debe contener el markdown duplicado de AnyDoc
+            self.assertNotIn("u1_s01_01_datos_limites.md", files)
+            # NO debe contener SKILL.md en gemini_notebook
+            self.assertNotIn("SKILL.md", files)
+            
+            # Pero el .md de AnyDoc SÍ se mantiene en la carpeta de clases
+            self.assertTrue((mat_dir / "datos_limites.md").exists())
+            # Y SKILL.md vive en la raíz del curso
+            self.assertTrue((course / "SKILL.md").exists())
 
 
 if __name__ == "__main__":

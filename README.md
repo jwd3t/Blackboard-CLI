@@ -71,7 +71,7 @@ cuadernos/
     │   └── Semana 02/
     ├── 03_ANUNCIOS/
     │   └── historial_anuncios.md <-- 📢 Comunicados oficiales del profesor
-    └── gemini_notebook/          <-- 🤖 Carpeta plana con prefijos uX_sXX (AnyDoc .md + originales) lista para NotebookLM
+    └── gemini_notebook/          <-- 🤖 Carpeta plana con prefijos uX_sXX (solo materiales originales y lecturas nativas) lista para NotebookLM
 ```
 
 ---

@@ -12,8 +12,11 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### ✨ Añadido
 - **Motor AnyDoc de Conversión a Markdown Integrado (`firecrawl-anydoc`):**
   - Conversión automática y ultrarrápida de documentos (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.csv`, etc.) a formato Markdown limpio (`.md`).
-  - Coexistencia *side-by-side*: cada documento original conserva su gemelo `.md` adyacente en el mismo directorio del curso y en `gemini_notebook/`.
+  - Coexistencia *side-by-side*: cada documento original conserva su gemelo `.md` adyacente en el mismo directorio del curso (`02_MATERIALES_Y_CLASES` y `00_INFORMACION_GENERAL`).
   - Motor Rust 100% local sin costos ni dependencias de APIs en la nube. Fallback silencioso y resiliente ante archivos no estándar o corruptos.
+- **Aislamiento Limpio de `gemini_notebook/`:**
+  - Garantiza que `gemini_notebook/` contenga exclusivamente los materiales originales reales (PDF, PPTX, DOCX, XLSX, etc.) y lecturas nativas de Blackboard, sin duplicar los archivos `.md` de AnyDoc ni `SKILL.md`.
+  - Evita saturar o duplicar documentos al cargar la carpeta en Google NotebookLM.
 - **Generación Automática de Skills para Agentes IA (`SKILL.md`):**
   - Creación de `SKILL.md` y `.skills/estudio-curso/SKILL.md` con frontmatter YAML dentro de cada cuaderno de curso.
   - Instrucciones especializadas para Antigravity, Claude, ChatGPT, Gemini y Cursor que obligan al modelo a priorizar los archivos `.md` de AnyDoc, ahorrando más del 90% de ventana de contexto en consultas.
