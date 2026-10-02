@@ -11,7 +11,7 @@ import urllib.parse
 from pathlib import Path
 
 # Versión del software
-VERSION = "3.1.0"
+VERSION = "3.1.1"
 
 # Repositorio y Actualizaciones
 RELEASES_URL = "https://github.com/jwd3t/Blackboard-CLI/releases/"
