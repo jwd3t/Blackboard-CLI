@@ -100,6 +100,15 @@ cuadernos/
 
 ---
 
+## ⚖️ Aviso de uso
+
+* **Uso personal:** Esta herramienta está pensada para que cada estudiante descargue **sus propios cursos**, a los que ya tiene acceso, para estudiar. Tú inicias sesión con tu propia cuenta (incluido el 2FA); la herramienta no evade ninguna medida de seguridad.
+* **No compartas el material descargado:** Las diapositivas, lecturas y demás archivos de tus cursos pertenecen a sus autores y a tu institución. No los subas a repositorios, redes ni plataformas públicas, ni los distribuyas.
+* **Revisa las reglas de tu institución:** Algunas universidades limitan el acceso automatizado a su aula virtual. Es tu responsabilidad leer y cumplir los términos de uso de tu institución y de Blackboard.
+* **Sin afiliación:** Este proyecto es independiente y no está afiliado, respaldado ni patrocinado por Blackboard/Anthology ni por ninguna universidad.
+
+---
+
 ## 🛠️ Requisitos del Sistema
 
 * **Windows:** Windows 10 o Windows 11 (64 bits).
