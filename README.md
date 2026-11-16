@@ -11,7 +11,7 @@ No necesitas configurar entornos manualmente. El programa incluye gestores autom
 1. **Descarga y descomprime:**
    - Descarga el archivo [Blackboard-CLI.zip](https://github.com/jwd3t/Blackboard-CLI/releases) desde la sección de **Releases** de este repositorio y descomprímelo en cualquier carpeta de tu equipo.
 2. **Ejecutar:**
-   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v3.1.1-Windows.bat`).
+   - **En Windows:** Haz doble clic en **`BlackboardCLI-v*.bat`** (ej. `BlackboardCLI-v3.2.0-Windows.bat`).
    - **En Mac:** Haz doble clic en **`BlackboardCLI-v*.command`** (o en la terminal: `./BlackboardCLI-v*.command`).
    - **En Linux:** Abre la terminal en la carpeta y ejecuta **`./BlackboardCLI-v*.sh`**.
    - *Nota de la primera vez:* En su primer arranque, el programa creará automáticamente un entorno virtual aislado (`.venv`) e instalará las librerías necesarias. **No dejará ningún residuo en tu sistema.**
@@ -40,6 +40,7 @@ La CLI cuenta con una experiencia de control híbrido moderna:
 | `[6]` | `logout` | **Cerrar Sesión:** Borra de inmediato las credenciales y cookies de la institución activa. |
 | `[7]` | `notebook`| **Exportar a Gemini Notebook:** Genera una carpeta plana (`gemini_notebook/`) optimizada para NotebookLM. |
 | `[8]` | `institucion`| **Cambiar Institución:** Alterna entre UPC, UCV, UPN, SENATI o agrega cualquier URL de Blackboard Learn. |
+| `[9]` | `carpeta` | **Carpeta de Cuadernos:** Elige dónde guardar o actualizar tus cuadernos en tu PC (ej. Escritorio, selector visual o ruta arrastrada). |
 | **Accesos Rápidos** | | |
 | `[o]` | `abrir` | **Explorador:** Abre la carpeta raíz de `cuadernos/` en el explorador de archivos nativo. |
 | `[g]` | `gemini` | **Notas IA:** Abre la carpeta de cuadernos con tips para arrastrar a Google NotebookLM. |
@@ -124,8 +125,7 @@ python src/cli.py
 
 Para correr las pruebas unitarias:
 ```bash
-python tests/test_multi_institution.py
-python tests/test_gemini_export.py
+python -m unittest discover tests
 ```
 
 ---

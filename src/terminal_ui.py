@@ -44,6 +44,7 @@ TIPS = [
     "Usa [8] institucion para alternar entre UPC, UCV, UPN y SENATI sin perder tus sesiones.",
     "El comando [2] agenda te muestra exámenes y tareas ordenados por fecha de entrega.",
     "Presiona [w] para abrir directamente el aula virtual de tu universidad en tu navegador.",
+    "Usa [9] carpeta si tienes tus cuadernos en el Escritorio u otra ruta para actualizarlos directo allí.",
     "La sincronización inteligente solo descarga archivos nuevos, ahorrando tiempo y datos en disco.",
 ]
 

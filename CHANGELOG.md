@@ -7,6 +7,19 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [3.2.0] - 2026-11-16
+
+### ✨ Añadido
+- **Carpeta Personalizada para Guardar/Actualizar Cuadernos (`[9] carpeta`):**
+  - Nuevo comando interactivo `[9] carpeta` (`carpeta`, `ruta`, `ubicacion`) y argumento CLI para elegir dónde guardar o actualizar tus cuadernos en tu PC (por ejemplo, en el Escritorio).
+  - **Detección automática de Escritorio y cuadernos movidos:** Identifica tu Escritorio real en Windows (incluyendo OneDrive), macOS y Linux, detectando si ya moviste allí tus cuadernos o carpetas de cursos para actualizarlos directamente sin volver a descargar archivos existentes.
+  - **Selector visual nativo de carpetas:** Permite explorar y elegir cualquier directorio gráficamente con el explorador del sistema operativo (`tkinter.filedialog`).
+  - **Soporte para arrastrar y soltar rutas:** Limpieza automática de comillas y prefijos (`& `) de PowerShell al arrastrar una carpeta a la terminal.
+  - **Migración opcional y ruta visible:** Muestra la ruta activa en el encabezado de la aplicación y en `status`, y ofrece mover tus cuadernos actuales si eliges una carpeta vacía.
+  - Nuevas pruebas unitarias en `tests/test_output_dir.py`.
+
+---
+
 ## [3.1.1] - 2026-10-02
 
 ### 🐛 Corregido

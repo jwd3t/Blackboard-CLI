@@ -16,6 +16,7 @@ from dateutil import parser as date_parser
 
 from config import (
     OUTPUT_DIR,
+    get_output_dir,
     DIR_INFO_GENERAL,
     DIR_EVALUACIONES,
     DIR_MATERIALES,
@@ -463,7 +464,7 @@ def format_display_path(dest_dir: Path, course_dir: Path | None, current_relativ
 class CourseNotebookOrganizer:
     def __init__(self, client: UltraClient, output_dir: Path | None = None):
         self.client = client
-        self.output_dir = output_dir or OUTPUT_DIR
+        self.output_dir = output_dir if output_dir is not None else get_output_dir()
         self._processed_course_files: set[str] = set()
         self.output_dir.mkdir(parents=True, exist_ok=True)
 

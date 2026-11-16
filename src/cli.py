@@ -90,6 +90,13 @@ console = Console(force_terminal=True, color_system="truecolor")
 from config import (
     BASE_URL,
     OUTPUT_DIR,
+    DEFAULT_OUTPUT_DIR,
+    get_output_dir,
+    set_output_dir,
+    get_desktop_dir,
+    clean_user_path,
+    pick_folder_dialog,
+    detect_course_folders,
     VERSION,
     RELEASES_URL,
     get_base_url,
@@ -238,6 +245,15 @@ def print_header(user: dict | None = None):
         status_bar.append("Selecciona tu universidad para continuar", style="dim")
 
     console.print(status_bar)
+
+    out_dir = get_output_dir()
+    is_custom_dir = out_dir.resolve() != DEFAULT_OUTPUT_DIR.resolve()
+    dir_line = Text()
+    dir_line.append("  📁 Cuadernos: ", style="dim grey70")
+    dir_line.append(f"{out_dir}", style="bold cyan" if is_custom_dir else "dim white")
+    if is_custom_dir:
+        dir_line.append(" (Personalizada)", style="dim bright_green")
+    console.print(dir_line)
     console.print()
 
 
@@ -343,7 +359,7 @@ def cmd_status():
         table.add_row("Código / Usuario", f"[bright_cyan]{user.get('studentId') or user.get('userName', 'N/A')}[/bright_cyan]")
         table.add_row("ID Ultra", f"[dim]{user.get('id', 'N/A')}[/dim]")
         table.add_row("Servidor", f"[dim]{base_url}[/dim]")
-        table.add_row("Cuadernos", f"[dim]{OUTPUT_DIR}[/dim]")
+        table.add_row("Cuadernos", f"[dim]{get_output_dir()}[/dim]")
 
         update_info = check_for_updates()
         if update_info and update_info.get("has_update"):
@@ -356,7 +372,7 @@ def cmd_status():
         table.add_row("Estado", "[bold red]✖ Sesión inactiva o expirada[/bold red]")
         table.add_row("Institución activa", f"[{inst_color}]{inst.get('name', 'N/A')}[/{inst_color}]")
         table.add_row("Servidor", f"[dim]{base_url}[/dim]")
-        table.add_row("Cuadernos", f"[dim]{OUTPUT_DIR}[/dim]")
+        table.add_row("Cuadernos", f"[dim]{get_output_dir()}[/dim]")
 
         update_info = check_for_updates()
         if update_info and update_info.get("has_update"):
@@ -522,8 +538,9 @@ def _run_sync_all(organizer, courses):
         )
 
     console.print(table)
-    console.print(f"\n  📁 Cuadernos en: [bold bright_cyan]{OUTPUT_DIR}[/bold bright_cyan]")
-    console.print("  💡 Contexto IA:  [bold bright_cyan]cuadernos/RESUMEN_SEMESTRE_IA.md[/bold bright_cyan]")
+    out_dir = get_output_dir()
+    console.print(f"\n  📁 Cuadernos en: [bold bright_cyan]{out_dir}[/bold bright_cyan]")
+    console.print(f"  💡 Contexto IA:  [bold bright_cyan]{out_dir / 'RESUMEN_SEMESTRE_IA.md'}[/bold bright_cyan]")
 
     if Confirm.ask("\n[bold cyan]✨ ¿Deseas generar la carpeta unificada para Gemini Notebook / NotebookLM para los cursos sincronizados?[/bold cyan]", default=True):
         for c in summary["courses"]:
@@ -573,9 +590,10 @@ def _export_course_to_gemini(course_dir: Path, manifest: list[dict] | None = Non
 
 def cmd_notebook():
     """Genera la carpeta unificada para Gemini Notebook (Exportación sin red)."""
-    dirs = [d for d in OUTPUT_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
+    out_dir = get_output_dir()
+    dirs = [d for d in out_dir.iterdir() if d.is_dir() and not d.name.startswith(".")] if out_dir.exists() else []
     if not dirs:
-        console.print("[yellow]No se encontraron cursos descargados en la carpeta cuadernos.[/yellow]")
+        console.print(f"[yellow]No se encontraron cursos descargados en: {out_dir}[/yellow]")
         return
 
     options = [
@@ -814,29 +832,31 @@ def cmd_update(update_info: dict | None = None):
 def cmd_open_cuadernos():
     """Abre la carpeta raíz de cuadernos en el explorador de archivos nativo."""
     print_header()
+    out_dir = get_output_dir()
     console.print(Panel(
         f"[bold white]Abriendo carpeta de cuadernos:[/bold white]\n"
-        f"[bright_cyan]{OUTPUT_DIR}[/bright_cyan]\n\n"
+        f"[bright_cyan]{out_dir}[/bright_cyan]\n\n"
         f"[dim grey70]Se abrirá la ventana del explorador de archivos en tu sistema operativo...[/dim grey70]",
         title="[bold bright_cyan] 📁 Explorador de Cuadernos [/bold bright_cyan]",
         title_align="left",
         border_style="bright_cyan",
         box=box.ROUNDED
     ))
-    ok = open_in_file_manager(OUTPUT_DIR)
+    ok = open_in_file_manager(out_dir)
     if ok:
         console.print("[bold green]✔ Carpeta abierta en el explorador de archivos.[/bold green]")
     else:
-        console.print(f"[yellow]⚠️ No se pudo abrir automáticamente. Puedes acceder manualmente en: {OUTPUT_DIR}[/yellow]")
+        console.print(f"[yellow]⚠️ No se pudo abrir automáticamente. Puedes acceder manualmente en: {out_dir}[/yellow]")
     timed_pause(2)
 
 
 def cmd_open_gemini():
     """Abre la carpeta de cuadernos con instrucciones para Gemini Notebook / NotebookLM."""
     print_header()
+    out_dir = get_output_dir()
     console.print(Panel(
         f"[bold white]Carpeta de Cuadernos para IA:[/bold white]\n"
-        f"[bright_cyan]{OUTPUT_DIR}[/bright_cyan]\n\n"
+        f"[bright_cyan]{out_dir}[/bright_cyan]\n\n"
         f"[bold bright_green]💡 Tip Pro para Estudiar con NotebookLM:[/bold bright_green]\n"
         f"[white]1. Entra a la carpeta de tu curso y luego a [bold cyan]gemini_notebook/[/bold cyan].[/white]\n"
         f"[white]2. Arrastra los archivos [bold].md[/bold] o [bold].pdf[/bold] directamente a [bold cyan]NotebookLM[/bold cyan] (https://notebooklm.google.com).[/white]\n"
@@ -846,7 +866,7 @@ def cmd_open_gemini():
         border_style="bright_magenta",
         box=box.ROUNDED
     ))
-    open_in_file_manager(OUTPUT_DIR)
+    open_in_file_manager(out_dir)
     timed_pause(3)
 
 
@@ -982,6 +1002,170 @@ def cmd_institution(is_first_time: bool = False):
                 return
 
 
+def _resolve_desktop_cuadernos(desktop: Path) -> Path:
+    """Detecta automáticamente si el usuario ya movió sus cuadernos al Escritorio."""
+    default_desk = desktop / "cuadernos"
+    if default_desk.exists() and default_desk.is_dir():
+        return default_desk
+
+    # Buscar subcarpetas en el Escritorio que parezcan contener cuadernos (ej. 'Mis Cuadernos', 'Cuadernos UPC')
+    candidates = []
+    if desktop.exists():
+        try:
+            for sub in sorted(desktop.iterdir(), key=lambda p: p.name.lower()):
+                if sub.is_dir() and not sub.name.startswith("."):
+                    if "cuaderno" in sub.name.lower() or detect_course_folders(sub):
+                        candidates.append(sub)
+        except Exception:
+            pass
+
+    if candidates:
+        candidates.sort(key=lambda p: (0 if "cuaderno" in p.name.lower() else 1, p.name.lower()))
+        first = candidates[0]
+        if Confirm.ask(f"\n[bold cyan]✨ Encontramos la carpeta '[bold white]{first.name}[/bold white]' en tu Escritorio.[/bold cyan]\n   ¿Deseas usar [bright_cyan]{first}[/bright_cyan]?", default=True):
+            return first
+
+    # Si tiene carpetas de cursos sueltas directamente en el Escritorio
+    if detect_course_folders(desktop):
+        if Confirm.ask(f"\n[bold cyan]✨ Detectamos carpetas de cursos directamente en tu Escritorio ({desktop}).[/bold cyan]\n   ¿Deseas actualizar directamente ahí (s) o crear '{default_desk.name}/' dentro (n)?", default=True):
+            return desktop
+
+    return default_desk
+
+
+def _move_existing_cuadernos(old_dir: Path, new_dir: Path) -> int:
+    """Mueve los cuadernos y archivos maestros de old_dir a new_dir de forma segura."""
+    import shutil
+    moved = 0
+    items_to_move = detect_course_folders(old_dir)
+    for extra_name in ["RESUMEN_SEMESTRE_IA.md", "SKILL.md", ".skills"]:
+        extra = old_dir / extra_name
+        if extra.exists():
+            items_to_move.append(extra)
+
+    for item in items_to_move:
+        dest = new_dir / item.name
+        if dest.exists():
+            continue
+        try:
+            shutil.move(str(item), str(dest))
+            moved += 1
+        except Exception as e:
+            console.print(f"[yellow]⚠️ No se pudo mover {item.name}: {e}[/yellow]")
+    return moved
+
+
+def cmd_carpeta():
+    """Configura la carpeta donde se guardan y actualizan los cuadernos en la PC."""
+    desktop = get_desktop_dir()
+
+    def _dir_header():
+        print_header()
+        curr = get_output_dir()
+        is_custom = curr.resolve() != DEFAULT_OUTPUT_DIR.resolve()
+        courses_here = detect_course_folders(curr)
+        badge = "[bold bright_green]Personalizada[/bold bright_green]" if is_custom else "[dim]Por defecto[/dim]"
+        courses_info = f"[bold green]{len(courses_here)} cursos detectados[/bold green]" if courses_here else "[dim]Sin cursos aún[/dim]"
+        console.print(Panel(
+            f"[bold white]Ubicación actual:[/bold white] [bold bright_cyan]{curr}[/bold bright_cyan] ({badge})\n"
+            f"[bold white]Contenido:[/bold white] {courses_info}\n\n"
+            f"[dim grey70]Si moviste tus cuadernos a tu Escritorio u otra carpeta de tu PC, selecciónala aquí\n"
+            f"para que al sincronizar se actualicen directo ahí sin volver a descargar lo que ya tienes.[/dim grey70]",
+            title="[bold white] 📍 Ubicación de Cuadernos [/bold white]",
+            title_align="left",
+            border_style="bright_cyan",
+            box=box.ROUNDED
+        ))
+
+    options = [
+        {"id": "1", "key_label": "[1]", "icon": "🖥️", "command": "escritorio", "desc": f"Usar Escritorio ({desktop / 'cuadernos'} o existente)", "aliases": ["1", "escritorio", "desktop"]},
+        {"id": "2", "key_label": "[2]", "icon": "📂", "command": "examinar", "desc": "Elegir carpeta visualmente (Explorador del sistema)", "aliases": ["2", "examinar", "buscar", "browse", "explorar"]},
+        {"id": "3", "key_label": "[3]", "icon": "⌨️", "command": "ruta", "desc": "Escribir o arrastrar la ruta de una carpeta aquí", "aliases": ["3", "ruta", "manual", "escribir", "path"]},
+        {"id": "4", "key_label": "[4]", "icon": "🏠", "command": "defecto", "desc": f"Restaurar ubicación por defecto ({DEFAULT_OUTPUT_DIR.name}/)", "aliases": ["4", "defecto", "default", "restaurar"]},
+        {"is_separator": True, "title": ""},
+        {"id": "0", "key_label": "[0]", "icon": "↩", "command": "volver", "desc": "Volver al menú principal", "aliases": ["0", "v", "volver", "back", "cancelar"]},
+    ]
+
+    choice = hybrid_select(
+        options=options,
+        title="Carpeta de Destino",
+        header_func=_dir_header,
+        tip_text="Usa [1] para el Escritorio, [2] para abrir el selector visual o [3] para arrastrar tu carpeta.",
+        default_idx=0
+    )
+
+    if choice in ["0", "v", "volver", "back", "cancelar"]:
+        return
+
+    old_dir = get_output_dir()
+    target_path: Path | None = None
+
+    if choice in ["1", "escritorio", "desktop"]:
+        target_path = _resolve_desktop_cuadernos(desktop)
+    elif choice in ["2", "examinar", "buscar", "browse", "explorar"]:
+        console.print("\n[dim]Abriendo selector de carpetas... (revisa si la ventana apareció detrás de la terminal)[/dim]")
+        picked = pick_folder_dialog(initial_dir=old_dir if old_dir.exists() else desktop)
+        if not picked:
+            console.print("[yellow]No se seleccionó ninguna carpeta.[/yellow]")
+            timed_pause(2)
+            return
+        if picked.resolve() == desktop.resolve() and (desktop / "cuadernos").exists():
+            if Confirm.ask(f"\nSeleccionaste el Escritorio, pero ya existe '{desktop / 'cuadernos'}'. ¿Usar esa subcarpeta?", default=True):
+                picked = desktop / "cuadernos"
+        target_path = picked
+    elif choice in ["3", "ruta", "manual", "escribir", "path"]:
+        console.print("\n[dim]Tip: Puedes arrastrar la carpeta desde el Explorador de Windows / Finder directo a esta consola y presionar ENTER.[/dim]\n")
+        raw_path = Prompt.ask("[bold bright_cyan]Ruta de la carpeta[/bold bright_cyan]")
+        cleaned = clean_user_path(raw_path)
+        if not cleaned:
+            console.print("[yellow]Operación cancelada: ruta vacía.[/yellow]")
+            timed_pause(2)
+            return
+        cand = Path(cleaned).expanduser()
+        if cand.exists() and not cand.is_dir():
+            console.print("[bold red]✖ La ruta ingresada corresponde a un archivo, no a una carpeta.[/bold red]")
+            timed_pause(2)
+            return
+        if not cand.exists():
+            if not Confirm.ask(f"La carpeta '[cyan]{cand}[/cyan]' no existe todavía. ¿Deseas crearla?", default=True):
+                console.print("[dim]Operación cancelada sin cambios.[/dim]")
+                timed_pause(2)
+                return
+        target_path = cand.resolve()
+    elif choice in ["4", "defecto", "default", "restaurar"]:
+        saved = set_output_dir(None)
+        console.print(f"\n[bold green]✔ Ubicación restaurada por defecto:[/bold green] [bold bright_cyan]{saved}[/bold bright_cyan]")
+        timed_pause(2)
+        return
+    else:
+        console.print(f"[red]Opción no reconocida: {choice}[/red]")
+        timed_pause(2)
+        return
+
+    if not target_path:
+        return
+
+    existing_at_target = detect_course_folders(target_path) if target_path.exists() else []
+    existing_at_old = detect_course_folders(old_dir) if old_dir.exists() else []
+
+    saved = set_output_dir(target_path)
+    console.print(f"\n[bold green]✔ ¡Ubicación de cuadernos guardada![/bold green]")
+    console.print(f"  📁 Ruta activa: [bold bright_cyan]{saved}[/bold bright_cyan]")
+
+    if existing_at_target:
+        console.print(f"  📚 [bold green]{len(existing_at_target)} cursos existentes detectados[/bold green] — se actualizarán incrementalmente al sincronizar:")
+        for cdir in existing_at_target[:5]:
+            console.print(f"     • [white]{cdir.name}[/white]")
+        if len(existing_at_target) > 5:
+            console.print(f"     • [dim]... y {len(existing_at_target) - 5} más[/dim]")
+    elif existing_at_old and old_dir.resolve() != saved.resolve():
+        if Confirm.ask(f"\nTienes {len(existing_at_old)} cursos en la carpeta anterior ({old_dir}). ¿Deseas moverlos a la nueva ubicación?", default=False):
+            moved = _move_existing_cuadernos(old_dir, saved)
+            console.print(f"[bold green]✔ Se movieron {moved} elementos a {saved}.[/bold green]")
+
+    timed_pause(3)
+
+
 def interactive_menu():
     """Bucle principal del menú interactivo híbrido estilo Claude Code / Antigravity."""
     setup_terminal_window(120, 40)
@@ -1001,6 +1185,7 @@ def interactive_menu():
             {"id": "6", "key_label": "[6]", "icon": "🚪", "command": "logout", "desc": "Cerrar sesión y borrar credenciales", "aliases": ["6", "logout"]},
             {"id": "7", "key_label": "[7]", "icon": "🤖", "command": "notebook", "desc": "Exportar a Gemini Notebook", "aliases": ["7", "notebook", "export"]},
             {"id": "8", "key_label": "[8]", "icon": "🏫", "command": "institucion", "desc": "Cambiar universidad o instituto", "aliases": ["8", "institucion", "universidad", "university", "inst"]},
+            {"id": "9", "key_label": "[9]", "icon": "📍", "command": "carpeta", "desc": "Elegir carpeta donde guardar los cuadernos (ej: Escritorio)", "aliases": ["9", "carpeta", "ruta", "ubicacion", "destino", "folder", "dir", "path"]},
             {"is_separator": True, "title": "Accesos Rápidos"},
             {"id": "o", "key_label": "[o]", "icon": "📁", "command": "abrir", "desc": "Abrir carpeta de cuadernos en el explorador", "aliases": ["o", "abrir", "open"]},
             {"id": "g", "key_label": "[g]", "icon": "📂", "command": "gemini", "desc": "Abrir carpeta de notas de Gemini Notebook", "aliases": ["g", "gemini", "notebooklm"]},
@@ -1060,6 +1245,9 @@ def interactive_menu():
         elif choice in ["8", "institucion", "universidad", "university", "inst"]:
             cmd_institution()
             continue
+        elif choice in ["9", "carpeta", "ruta", "ubicacion", "destino", "folder", "dir", "path"]:
+            cmd_carpeta()
+            continue
         elif choice in ["o", "abrir", "open"]:
             cmd_open_cuadernos()
             continue
@@ -1113,6 +1301,8 @@ def main():
                 cmd_notebook()
             elif arg in ["8", "institucion", "universidad", "university", "inst"]:
                 cmd_institution()
+            elif arg in ["9", "carpeta", "ruta", "ubicacion", "destino", "folder", "dir", "path"]:
+                cmd_carpeta()
             elif arg in ["update", "actualizar", "version"]:
                 cmd_update()
             elif arg in ["o", "open", "abrir"]:
@@ -1123,7 +1313,7 @@ def main():
                 cmd_open_web()
             else:
                 console.print(f"[red]Comando desconocido: {arg}[/red]")
-                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion, update, abrir, gemini, web")
+                console.print("Comandos disponibles: login, status, courses, agenda, sync, logout, notebook, institucion, carpeta, update, abrir, gemini, web")
         else:
             interactive_menu()
     except KeyboardInterrupt:

@@ -11,7 +11,7 @@ import urllib.parse
 from pathlib import Path
 
 # Versión del software
-VERSION = "3.1.1"
+VERSION = "3.2.0"
 
 # Repositorio y Actualizaciones
 RELEASES_URL = "https://github.com/jwd3t/Blackboard-CLI/releases/"
@@ -22,7 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SESSION_DIR = BASE_DIR / ".session_data"
 ACTIVE_INSTITUTION_FILE = SESSION_DIR / "active_institution.json"
 UPDATE_CACHE_FILE = SESSION_DIR / "update_check.json"
-OUTPUT_DIR = BASE_DIR / "cuadernos"
+OUTPUT_DIR_CONFIG_FILE = SESSION_DIR / "output_dir.json"
+DEFAULT_OUTPUT_DIR = BASE_DIR / "cuadernos"
 
 # Instituciones preconfiguradas
 DEFAULT_INSTITUTIONS: dict[str, dict] = {
@@ -324,11 +325,141 @@ def open_in_file_manager(path: Path) -> bool:
         return False
 
 
+def clean_user_path(raw: str) -> str:
+    """Limpia rutas pegadas o arrastradas a la terminal (comillas simples/dobles, '& ' de PowerShell)."""
+    s = (raw or "").strip()
+    if s.startswith("& "):
+        s = s[2:].strip()
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        s = s[1:-1].strip()
+    return s
+
+
+def get_desktop_dir() -> Path:
+    """Detecta la ruta real del Escritorio del usuario (incluyendo redirecciones de OneDrive en Windows)."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            CSIDL_DESKTOPDIRECTORY = 0x0010
+            buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+            if ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_DESKTOPDIRECTORY, None, 0, buf) == 0:
+                p = Path(buf.value)
+                if p.exists():
+                    return p
+        except Exception:
+            pass
+        for cand in [
+            Path.home() / "OneDrive" / "Desktop",
+            Path.home() / "OneDrive" / "Escritorio",
+            Path.home() / "Desktop",
+            Path.home() / "Escritorio",
+        ]:
+            if cand.exists():
+                return cand
+        return Path.home() / "Desktop"
+
+    for cand in [Path.home() / "Desktop", Path.home() / "Escritorio"]:
+        if cand.exists():
+            return cand
+    return Path.home()
+
+
+def get_output_dir() -> Path:
+    """Retorna la carpeta configurada para guardar los cuadernos (o la ruta por defecto)."""
+    if OUTPUT_DIR_CONFIG_FILE.exists():
+        try:
+            with open(OUTPUT_DIR_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            custom = str(data.get("output_dir", "")).strip()
+            if custom:
+                return Path(custom)
+        except Exception:
+            pass
+    return DEFAULT_OUTPUT_DIR
+
+
+def set_output_dir(new_path: str | Path | None = None, create_dir: bool = True) -> Path:
+    """Guarda una ubicación personalizada para los cuadernos o restaura la ruta por defecto."""
+    global OUTPUT_DIR
+
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    if new_path is None or str(new_path).strip().lower() in ("", "default", "defecto"):
+        if OUTPUT_DIR_CONFIG_FILE.exists():
+            try:
+                OUTPUT_DIR_CONFIG_FILE.unlink()
+            except Exception:
+                pass
+        OUTPUT_DIR = DEFAULT_OUTPUT_DIR
+        if create_dir:
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        return OUTPUT_DIR
+
+    cleaned = clean_user_path(str(new_path)) if isinstance(new_path, str) else str(new_path)
+    target = Path(cleaned).expanduser().resolve()
+    if create_dir:
+        target.mkdir(parents=True, exist_ok=True)
+
+    with open(OUTPUT_DIR_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump({"output_dir": str(target)}, f, indent=2, ensure_ascii=False)
+
+    OUTPUT_DIR = target
+    return target
+
+
+def pick_folder_dialog(initial_dir: Path | None = None) -> Path | None:
+    """Abre el selector nativo de carpetas del sistema operativo (tkinter)."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+            root.update()
+        except Exception:
+            pass
+        start_dir = str(initial_dir) if initial_dir and initial_dir.exists() else str(get_desktop_dir())
+        chosen = filedialog.askdirectory(
+            parent=root,
+            title="Selecciona la carpeta donde guardar o actualizar tus cuadernos",
+            initialdir=start_dir,
+        )
+        root.destroy()
+        if chosen:
+            return Path(chosen).resolve()
+    except Exception:
+        pass
+    return None
+
+
+def detect_course_folders(folder: Path) -> list[Path]:
+    """Detecta carpetas de cursos existentes dentro de una ruta dada."""
+    if not folder or not folder.exists() or not folder.is_dir():
+        return []
+    found = []
+    try:
+        for item in sorted(folder.iterdir(), key=lambda p: p.name.lower()):
+            if not item.is_dir() or item.name.startswith("."):
+                continue
+            if (
+                item.name.startswith("[")
+                or (item / "CUADERNO_CURSO.md").exists()
+                or (item / DIR_MATERIALES).exists()
+                or (item / DIR_INFO_GENERAL).exists()
+            ):
+                found.append(item)
+    except Exception:
+        pass
+    return found
+
+
 # Inicialización de variables para compatibilidad directa
 _current_inst = get_active_institution()
 BASE_URL = _current_inst.get("base_url", DEFAULT_INSTITUTIONS["upc"]["base_url"])
 COOKIES_FILE = get_cookies_file()
 DOWNLOADS_CACHE_FILE = get_downloads_cache_file()
+OUTPUT_DIR = get_output_dir()
 
 # Estructura del cuaderno por curso
 DIR_INFO_GENERAL = "00_INFORMACION_GENERAL"
